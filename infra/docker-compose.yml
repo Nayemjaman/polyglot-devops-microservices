@@ -67,7 +67,7 @@ services:
         condition: service_healthy
     environment:
       DJANGO_DEBUG: ${AUTH_DJANGO_DEBUG:-False}
-      DJANGO_SECRET_KEY: ${AUTH_DJANGO_SECRET_KEY:-change-me-auth-secret-key}
+      DJANGO_SECRET_KEY: ${AUTH_DJANGO_SECRET_KEY:-dev-auth-secret-key-change-me-at-least-32-characters}
       DJANGO_ALLOWED_HOSTS: ${AUTH_DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,auth-service}
       POSTGRES_DB: ${AUTH_DB_NAME:-auth_service_db}
       POSTGRES_USER: ${AUTH_DB_USER:-auth_service_user}

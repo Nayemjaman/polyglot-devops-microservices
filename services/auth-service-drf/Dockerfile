@@ -12,7 +12,12 @@ RUN pip install --upgrade pip \
 
 COPY . .
 
-RUN python manage.py collectstatic --noinput
+RUN POSTGRES_DB=build_db \
+    POSTGRES_USER=build_user \
+    POSTGRES_PASSWORD=build_password \
+    POSTGRES_HOST=localhost \
+    POSTGRES_PORT=5432 \
+    python manage.py collectstatic --noinput
 
 EXPOSE 8000
 
