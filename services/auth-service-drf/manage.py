@@ -2,10 +2,26 @@
 """Django's command-line utility for administrative tasks."""
 import os
 import sys
+from pathlib import Path
+
+
+def load_local_env():
+    """Load simple KEY=VALUE pairs from .env for local management commands."""
+    env_path = Path(__file__).resolve().parent / '.env'
+    if not env_path.exists():
+        return
+
+    for line in env_path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith('#') or '=' not in line:
+            continue
+        key, value = line.split('=', 1)
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
 
 def main():
     """Run administrative tasks."""
+    load_local_env()
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core.settings')
     try:
         from django.core.management import execute_from_command_line
