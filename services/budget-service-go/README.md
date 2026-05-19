@@ -5,8 +5,8 @@ Go service built with Gin.
 ## Local Run
 
 ```bash
-go mod tidy
-go run ./cmd/api
+make tidy
+make run
 ```
 
 Default address:
@@ -26,7 +26,7 @@ Example response:
 
 ```json
 {
-  "message": "hello world",
+  "message": "hello FirstName LastName",
   "service": "budget-service"
 }
 ```
