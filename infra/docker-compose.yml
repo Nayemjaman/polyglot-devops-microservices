@@ -1,0 +1,182 @@
+name: polyglot-devops-microservices
+
+x-postgres-common: &postgres-common
+  image: postgres:16-alpine
+  restart: unless-stopped
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+    interval: 10s
+    timeout: 5s
+    retries: 5
+    start_period: 10s
+  networks:
+    - backend
+
+x-pgbouncer-common: &pgbouncer-common
+  image: edoburu/pgbouncer:v1.25.1-p0
+  restart: unless-stopped
+  networks:
+    - backend
+
+services:
+  auth-postgres:
+    <<: *postgres-common
+    container_name: auth-postgres
+    environment:
+      POSTGRES_DB: ${AUTH_DB_NAME:-auth_service_db}
+      POSTGRES_USER: ${AUTH_DB_USER:-auth_service_user}
+      POSTGRES_PASSWORD: ${AUTH_DB_PASSWORD:-auth_service_password}
+    volumes:
+      - auth-postgres-data:/var/lib/postgresql/data
+
+  auth-pgbouncer:
+    <<: *pgbouncer-common
+    container_name: auth-pgbouncer
+    depends_on:
+      auth-postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${AUTH_DB_USER:-auth_service_user}:${AUTH_DB_PASSWORD:-auth_service_password}@auth-postgres:5432/${AUTH_DB_NAME:-auth_service_db}
+      LISTEN_PORT: 6432
+      AUTH_TYPE: plain
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 200
+      DEFAULT_POOL_SIZE: 20
+      MIN_POOL_SIZE: 5
+      RESERVE_POOL_SIZE: 5
+      RESERVE_POOL_TIMEOUT: 5
+      SERVER_RESET_QUERY: DISCARD ALL
+      ADMIN_USERS: ${AUTH_DB_USER:-auth_service_user}
+      STATS_USERS: ${AUTH_DB_USER:-auth_service_user}
+    ports:
+      - "6432:6432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 6432 -U ${AUTH_DB_USER:-auth_service_user} -d ${AUTH_DB_NAME:-auth_service_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  budget-postgres:
+    <<: *postgres-common
+    container_name: budget-postgres
+    environment:
+      POSTGRES_DB: ${BUDGET_DB_NAME:-budget_service_db}
+      POSTGRES_USER: ${BUDGET_DB_USER:-budget_service_user}
+      POSTGRES_PASSWORD: ${BUDGET_DB_PASSWORD:-budget_service_password}
+    volumes:
+      - budget-postgres-data:/var/lib/postgresql/data
+
+  budget-pgbouncer:
+    <<: *pgbouncer-common
+    container_name: budget-pgbouncer
+    depends_on:
+      budget-postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${BUDGET_DB_USER:-budget_service_user}:${BUDGET_DB_PASSWORD:-budget_service_password}@budget-postgres:5432/${BUDGET_DB_NAME:-budget_service_db}
+      LISTEN_PORT: 6432
+      AUTH_TYPE: plain
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 200
+      DEFAULT_POOL_SIZE: 20
+      MIN_POOL_SIZE: 5
+      RESERVE_POOL_SIZE: 5
+      RESERVE_POOL_TIMEOUT: 5
+      SERVER_RESET_QUERY: DISCARD ALL
+      ADMIN_USERS: ${BUDGET_DB_USER:-budget_service_user}
+      STATS_USERS: ${BUDGET_DB_USER:-budget_service_user}
+    ports:
+      - "6433:6432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 6432 -U ${BUDGET_DB_USER:-budget_service_user} -d ${BUDGET_DB_NAME:-budget_service_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  report-postgres:
+    <<: *postgres-common
+    container_name: report-postgres
+    environment:
+      POSTGRES_DB: ${REPORT_DB_NAME:-report_service_db}
+      POSTGRES_USER: ${REPORT_DB_USER:-report_service_user}
+      POSTGRES_PASSWORD: ${REPORT_DB_PASSWORD:-report_service_password}
+    volumes:
+      - report-postgres-data:/var/lib/postgresql/data
+
+  report-pgbouncer:
+    <<: *pgbouncer-common
+    container_name: report-pgbouncer
+    depends_on:
+      report-postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${REPORT_DB_USER:-report_service_user}:${REPORT_DB_PASSWORD:-report_service_password}@report-postgres:5432/${REPORT_DB_NAME:-report_service_db}
+      LISTEN_PORT: 6432
+      AUTH_TYPE: plain
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 200
+      DEFAULT_POOL_SIZE: 20
+      MIN_POOL_SIZE: 5
+      RESERVE_POOL_SIZE: 5
+      RESERVE_POOL_TIMEOUT: 5
+      SERVER_RESET_QUERY: DISCARD ALL
+      ADMIN_USERS: ${REPORT_DB_USER:-report_service_user}
+      STATS_USERS: ${REPORT_DB_USER:-report_service_user}
+    ports:
+      - "6434:6432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 6432 -U ${REPORT_DB_USER:-report_service_user} -d ${REPORT_DB_NAME:-report_service_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  transaction-postgres:
+    <<: *postgres-common
+    container_name: transaction-postgres
+    environment:
+      POSTGRES_DB: ${TRANSACTION_DB_NAME:-transaction_service_db}
+      POSTGRES_USER: ${TRANSACTION_DB_USER:-transaction_service_user}
+      POSTGRES_PASSWORD: ${TRANSACTION_DB_PASSWORD:-transaction_service_password}
+    volumes:
+      - transaction-postgres-data:/var/lib/postgresql/data
+
+  transaction-pgbouncer:
+    <<: *pgbouncer-common
+    container_name: transaction-pgbouncer
+    depends_on:
+      transaction-postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${TRANSACTION_DB_USER:-transaction_service_user}:${TRANSACTION_DB_PASSWORD:-transaction_service_password}@transaction-postgres:5432/${TRANSACTION_DB_NAME:-transaction_service_db}
+      LISTEN_PORT: 6432
+      AUTH_TYPE: plain
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 200
+      DEFAULT_POOL_SIZE: 20
+      MIN_POOL_SIZE: 5
+      RESERVE_POOL_SIZE: 5
+      RESERVE_POOL_TIMEOUT: 5
+      SERVER_RESET_QUERY: DISCARD ALL
+      ADMIN_USERS: ${TRANSACTION_DB_USER:-transaction_service_user}
+      STATS_USERS: ${TRANSACTION_DB_USER:-transaction_service_user}
+    ports:
+      - "6435:6432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 6432 -U ${TRANSACTION_DB_USER:-transaction_service_user} -d ${TRANSACTION_DB_NAME:-transaction_service_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+networks:
+  backend:
+    driver: bridge
+
+volumes:
+  auth-postgres-data:
+  budget-postgres-data:
+  report-postgres-data:
+  transaction-postgres-data:
