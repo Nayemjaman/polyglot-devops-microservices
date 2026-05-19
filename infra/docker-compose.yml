@@ -57,6 +57,43 @@ services:
       retries: 5
       start_period: 10s
 
+  auth-service:
+    build:
+      context: ../services/auth-service-drf
+    container_name: auth-service
+    restart: unless-stopped
+    depends_on:
+      auth-pgbouncer:
+        condition: service_healthy
+    environment:
+      DJANGO_DEBUG: ${AUTH_DJANGO_DEBUG:-False}
+      DJANGO_SECRET_KEY: ${AUTH_DJANGO_SECRET_KEY:-change-me-auth-secret-key}
+      DJANGO_ALLOWED_HOSTS: ${AUTH_DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,auth-service}
+      POSTGRES_DB: ${AUTH_DB_NAME:-auth_service_db}
+      POSTGRES_USER: ${AUTH_DB_USER:-auth_service_user}
+      POSTGRES_PASSWORD: ${AUTH_DB_PASSWORD:-auth_service_password}
+      POSTGRES_HOST: auth-pgbouncer
+      POSTGRES_PORT: 6432
+    command:
+      - gunicorn
+      - core.asgi:application
+      - -k
+      - uvicorn.workers.UvicornWorker
+      - --bind
+      - 0.0.0.0:8000
+      - --workers
+      - "4"
+    ports:
+      - "8000:8000"
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import socket; s=socket.create_connection(('127.0.0.1', 8000), 3); s.close()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
   budget-postgres:
     <<: *postgres-common
     container_name: budget-postgres
