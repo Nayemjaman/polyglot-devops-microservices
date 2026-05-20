@@ -59,7 +59,7 @@ services:
 
   auth-service:
     build:
-      context: ../services/auth-service-drf
+      context: ../services/auth-service
     container_name: auth-service
     restart: unless-stopped
     depends_on:
@@ -208,6 +208,88 @@ services:
       retries: 5
       start_period: 10s
 
+  transaction-minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    container_name: transaction-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${TRANSACTION_STORAGE_ACCESS_KEY:-transaction_service_access_key}
+      MINIO_ROOT_PASSWORD: ${TRANSACTION_STORAGE_SECRET_KEY:-transaction_service_secret_key}
+    volumes:
+      - transaction-minio-data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  transaction-minio-init:
+    image: minio/mc:RELEASE.2025-04-16T18-13-26Z
+    container_name: transaction-minio-init
+    depends_on:
+      transaction-minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${TRANSACTION_STORAGE_ACCESS_KEY:-transaction_service_access_key}
+      MINIO_ROOT_PASSWORD: ${TRANSACTION_STORAGE_SECRET_KEY:-transaction_service_secret_key}
+      TRANSACTION_STORAGE_BUCKET_NAME: ${TRANSACTION_STORAGE_BUCKET_NAME:-transaction-attachments}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        mc alias set transaction-minio http://transaction-minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"
+        mc mb --ignore-existing "transaction-minio/$$TRANSACTION_STORAGE_BUCKET_NAME"
+    networks:
+      - backend
+
+  transaction-service:
+    build:
+      context: ../services/transaction-service
+    container_name: transaction-service
+    restart: unless-stopped
+    depends_on:
+      transaction-pgbouncer:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+      transaction-minio-init:
+        condition: service_completed_successfully
+    environment:
+      APP_NAME: ${TRANSACTION_APP_NAME:-transaction-service}
+      APP_ENV: ${TRANSACTION_APP_ENV:-production}
+      HOST: 0.0.0.0
+      PORT: 8002
+      AUTH_SERVICE_URL: http://auth-service:8000
+      HTTP_TIMEOUT_SECONDS: ${TRANSACTION_HTTP_TIMEOUT_SECONDS:-5}
+      DATABASE_URL: postgresql+asyncpg://${TRANSACTION_DB_USER:-transaction_service_user}:${TRANSACTION_DB_PASSWORD:-transaction_service_password}@transaction-pgbouncer:6432/${TRANSACTION_DB_NAME:-transaction_service_db}?prepared_statement_cache_size=0
+      DATABASE_ECHO: ${TRANSACTION_DATABASE_ECHO:-False}
+      DATABASE_POOL_SIZE: ${TRANSACTION_DATABASE_POOL_SIZE:-5}
+      DATABASE_MAX_OVERFLOW: ${TRANSACTION_DATABASE_MAX_OVERFLOW:-10}
+      STORAGE_ENDPOINT_URL: http://transaction-minio:9000
+      STORAGE_REGION: ${TRANSACTION_STORAGE_REGION:-us-east-1}
+      STORAGE_ACCESS_KEY: ${TRANSACTION_STORAGE_ACCESS_KEY:-transaction_service_access_key}
+      STORAGE_SECRET_KEY: ${TRANSACTION_STORAGE_SECRET_KEY:-transaction_service_secret_key}
+      STORAGE_BUCKET_NAME: ${TRANSACTION_STORAGE_BUCKET_NAME:-transaction-attachments}
+      STORAGE_PUBLIC_BASE_URL: ${TRANSACTION_STORAGE_PUBLIC_BASE_URL:-http://127.0.0.1:9000}
+      STORAGE_PATH_PREFIX: ${TRANSACTION_STORAGE_PATH_PREFIX:-attachments}
+    ports:
+      - "8002:8002"
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import socket; s=socket.create_connection(('127.0.0.1', 8002), 3); s.close()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
 networks:
   backend:
     driver: bridge
@@ -217,3 +299,4 @@ volumes:
   budget-postgres-data:
   report-postgres-data:
   transaction-postgres-data:
+  transaction-minio-data:
