@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/nayem/polyglot-devops-microservices/services/budget-service-go/internal/config"
+	"github.com/nayem/polyglot-devops-microservices/services/budget-service/internal/config"
 )
 
 type authUserResponse struct {
