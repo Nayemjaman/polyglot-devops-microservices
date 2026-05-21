@@ -9,12 +9,14 @@ import (
 )
 
 const (
-	BudgetStatusActive   = "active"
-	BudgetStatusArchived = "archived"
-	BudgetStatusDraft    = "draft"
+	BudgetStatusActive    = "ACTIVE"
+	BudgetStatusArchived  = "ARCHIVED"
+	BudgetStatusCancelled = "CANCELLED"
 
-	AlertRuleTypeBudget   = "budget"
-	AlertRuleTypeCategory = "category"
+	AlertRuleTypePercentageUsed        = "PERCENTAGE_USED"
+	AlertRuleTypeBudgetExceeded        = "BUDGET_EXCEEDED"
+	AlertRuleTypeCategoryLimitWarning  = "CATEGORY_LIMIT_WARNING"
+	AlertRuleTypeCategoryLimitExceeded = "CATEGORY_LIMIT_EXCEEDED"
 )
 
 type Budget struct {
@@ -25,7 +27,7 @@ type Budget struct {
 	Month             int             `gorm:"not null;index:idx_budgets_user_period;check:month >= 1 AND month <= 12"`
 	TotalBudgetAmount decimal.Decimal `gorm:"type:numeric(14,2);not null;check:total_budget_amount >= 0"`
 	CurrencyCode      string          `gorm:"type:char(3);not null"`
-	Status            string          `gorm:"type:varchar(20);not null;default:'active';check:status IN ('active','archived','draft')"`
+	Status            string          `gorm:"type:varchar(20);not null;default:'ACTIVE';check:status IN ('ACTIVE','ARCHIVED','CANCELLED')"`
 	CreatedAt         time.Time       `gorm:"not null"`
 	UpdatedAt         time.Time       `gorm:"not null"`
 
@@ -72,7 +74,7 @@ func (c *BudgetCategory) BeforeCreate(_ *gorm.DB) error {
 type BudgetAlertRule struct {
 	ID                  uuid.UUID       `gorm:"type:uuid;primaryKey"`
 	BudgetID            uuid.UUID       `gorm:"type:uuid;not null;uniqueIndex:idx_budget_alert_rules_budget_type"`
-	RuleType            string          `gorm:"type:varchar(40);not null;uniqueIndex:idx_budget_alert_rules_budget_type;check:rule_type IN ('budget','category')"`
+	RuleType            string          `gorm:"type:varchar(40);not null;uniqueIndex:idx_budget_alert_rules_budget_type;check:rule_type IN ('PERCENTAGE_USED','BUDGET_EXCEEDED','CATEGORY_LIMIT_WARNING','CATEGORY_LIMIT_EXCEEDED')"`
 	ThresholdPercentage decimal.Decimal `gorm:"type:numeric(5,2);not null;check:threshold_percentage >= 0 AND threshold_percentage <= 100"`
 	IsEnabled           bool            `gorm:"not null;default:true"`
 	CreatedAt           time.Time       `gorm:"not null"`

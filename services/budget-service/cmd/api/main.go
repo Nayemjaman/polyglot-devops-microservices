@@ -31,7 +31,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	router := http.NewRouter(cfg, logger)
+	router := http.NewRouter(cfg, logger, db)
 
 	logger.Info("starting budget service", "address", cfg.HTTPAddr)
 	if err := router.Run(cfg.HTTPAddr); err != nil {

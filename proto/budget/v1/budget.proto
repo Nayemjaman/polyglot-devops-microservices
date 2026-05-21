@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package budget.v1;
+
+option go_package = "github.com/nayem/polyglot-devops-microservices/proto/gen/go/budget/v1;budgetv1";
+
+service BudgetService {
+  rpc GetUserBudgetStatus(BudgetStatusRequest) returns (BudgetStatusResponse);
+  rpc GetUserBudgetCategoryStatus(BudgetCategoryStatusRequest) returns (BudgetCategoryStatusResponse);
+}
+
+message BudgetStatusRequest {
+  string user_id = 1;
+  int32 year = 2;
+  int32 month = 3;
+}
+
+message BudgetCategoryStatusRequest {
+  string user_id = 1;
+  string category_id = 2;
+  int32 year = 3;
+  int32 month = 4;
+}
+
+message BudgetCategoryStatus {
+  string category_id = 1;
+  string category_name = 2;
+  string budget_amount = 3;
+  string spent_amount = 4;
+  string remaining_amount = 5;
+  string used_percentage = 6;
+  string status = 7;
+}
+
+message BudgetStatusResponse {
+  string user_id = 1;
+  int32 year = 2;
+  int32 month = 3;
+  string currency_code = 4;
+  string total_budget_amount = 5;
+  string total_spent_amount = 6;
+  string remaining_amount = 7;
+  string used_percentage = 8;
+  string status = 9;
+  repeated BudgetCategoryStatus categories = 10;
+}
+
+message BudgetCategoryStatusResponse {
+  string user_id = 1;
+  string category_id = 2;
+  string category_name = 3;
+  int32 year = 4;
+  int32 month = 5;
+  string currency_code = 6;
+  string budget_amount = 7;
+  string spent_amount = 8;
+  string remaining_amount = 9;
+  string used_percentage = 10;
+  string alert_threshold_percentage = 11;
+  string status = 12;
+  bool is_alert_triggered = 13;
+}

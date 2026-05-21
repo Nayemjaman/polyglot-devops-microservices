@@ -505,6 +505,154 @@ def run(args: argparse.Namespace) -> int:
     client.request("budget health", "GET", args.budget_url, "/health")
     client.request("budget hello", "GET", args.budget_url, "/hello", token=access_token)
 
+    smoke_budget_year = 3000 + int(suffix[:3], 16) % 5000
+    smoke_budget_month = int(suffix[3:5], 16) % 12 + 1
+    budget = client.request(
+        "create budget",
+        "POST",
+        args.budget_url,
+        "/api/budgets",
+        token=access_token,
+        json_body={
+            "name": f"Smoke Budget {suffix}",
+            "year": smoke_budget_year,
+            "month": smoke_budget_month,
+            "total_budget_amount": 50000,
+            "currency_code": "BDT",
+        },
+        expected={201},
+    )
+    budget_id = data_id(budget)
+    client.request(
+        "list budgets",
+        "GET",
+        args.budget_url,
+        "/api/budgets",
+        token=access_token,
+        query={"page": 1, "page_size": 20, "year": smoke_budget_year, "month": smoke_budget_month, "status": "ACTIVE"},
+    )
+
+    budget_category_id = None
+    alert_rule_id = None
+    if budget_id:
+        client.request("get budget", "GET", args.budget_url, f"/api/budgets/{budget_id}", token=access_token)
+        client.request(
+            "update budget",
+            "PATCH",
+            args.budget_url,
+            f"/api/budgets/{budget_id}",
+            token=access_token,
+            json_body={"name": f"Smoke Budget Updated {suffix}", "total_budget_amount": 55000, "status": "ACTIVE"},
+        )
+
+        budget_category = client.request(
+            "create budget category",
+            "POST",
+            args.budget_url,
+            f"/api/budgets/{budget_id}/categories",
+            token=access_token,
+            json_body={
+                "category_id": str(uuid.uuid4()),
+                "category_name_snapshot": "Smoke Food",
+                "budget_amount": 12000,
+                "alert_threshold_percentage": 80,
+            },
+            expected={201},
+        )
+        budget_category_id = data_id(budget_category)
+        client.request(
+            "list budget categories",
+            "GET",
+            args.budget_url,
+            f"/api/budgets/{budget_id}/categories",
+            token=access_token,
+        )
+        if budget_category_id:
+            client.request(
+                "update budget category",
+                "PATCH",
+                args.budget_url,
+                f"/api/budgets/{budget_id}/categories/{budget_category_id}",
+                token=access_token,
+                json_body={
+                    "category_name_snapshot": "Smoke Food Updated",
+                    "budget_amount": 15000,
+                    "alert_threshold_percentage": 85,
+                },
+            )
+
+        alert_rule = client.request(
+            "create alert rule",
+            "POST",
+            args.budget_url,
+            f"/api/budgets/{budget_id}/alert-rules",
+            token=access_token,
+            json_body={"rule_type": "PERCENTAGE_USED", "threshold_percentage": 80, "is_enabled": True},
+            expected={201},
+        )
+        alert_rule_id = data_id(alert_rule)
+        client.request(
+            "list alert rules",
+            "GET",
+            args.budget_url,
+            f"/api/budgets/{budget_id}/alert-rules",
+            token=access_token,
+        )
+        if alert_rule_id:
+            client.request(
+                "update alert rule",
+                "PATCH",
+                args.budget_url,
+                f"/api/budgets/{budget_id}/alert-rules/{alert_rule_id}",
+                token=access_token,
+                json_body={"threshold_percentage": 85, "is_enabled": True},
+            )
+
+        client.request(
+            "monthly budget status",
+            "GET",
+            args.budget_url,
+            "/api/budgets/status/monthly",
+            token=access_token,
+            query={"year": smoke_budget_year, "month": smoke_budget_month},
+            expected={200, 502},
+        )
+        client.request(
+            "category-wise budget status",
+            "GET",
+            args.budget_url,
+            "/api/budgets/status/category-wise",
+            token=access_token,
+            query={"year": smoke_budget_year, "month": smoke_budget_month},
+            expected={200, 502},
+        )
+        client.request(
+            "budget usage",
+            "GET",
+            args.budget_url,
+            f"/api/budgets/{budget_id}/usage",
+            token=access_token,
+            expected={200, 502},
+        )
+
+        if alert_rule_id:
+            client.request(
+                "delete alert rule",
+                "DELETE",
+                args.budget_url,
+                f"/api/budgets/{budget_id}/alert-rules/{alert_rule_id}",
+                token=access_token,
+            )
+        if budget_category_id:
+            client.request(
+                "delete budget category",
+                "DELETE",
+                args.budget_url,
+                f"/api/budgets/{budget_id}/categories/{budget_category_id}",
+                token=access_token,
+            )
+        client.request("delete budget", "DELETE", args.budget_url, f"/api/budgets/{budget_id}", token=access_token)
+
     if refresh_token:
         client.request(
             "auth logout",

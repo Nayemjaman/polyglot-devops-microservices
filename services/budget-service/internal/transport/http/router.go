@@ -1,24 +1,19 @@
 package http
 
 import (
-	"encoding/json"
 	"log/slog"
 	"net/http"
-	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/nayem/polyglot-devops-microservices/services/budget-service/internal/auth"
+	"github.com/nayem/polyglot-devops-microservices/services/budget-service/internal/clients/transaction"
 	"github.com/nayem/polyglot-devops-microservices/services/budget-service/internal/config"
+	"github.com/nayem/polyglot-devops-microservices/services/budget-service/internal/repositories"
+	"github.com/nayem/polyglot-devops-microservices/services/budget-service/internal/services"
+	"gorm.io/gorm"
 )
 
-type authUserResponse struct {
-	User struct {
-		FirstName string `json:"first_name"`
-		LastName  string `json:"last_name"`
-	} `json:"user"`
-}
-
-func NewRouter(cfg config.Config, logger *slog.Logger) *gin.Engine {
+func NewRouter(cfg config.Config, logger *slog.Logger, db *gorm.DB) *gin.Engine {
 	if cfg.AppEnv == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -31,7 +26,35 @@ func NewRouter(cfg config.Config, logger *slog.Logger) *gin.Engine {
 	router.Use(requestLogger(logger))
 
 	router.GET("/health", healthHandler)
-	router.GET("/hello", helloHandler(cfg, logger))
+	authClient := auth.NewClient(cfg.AuthServiceURL)
+	protected := router.Group("")
+	protected.Use(authMiddleware(authClient, logger))
+	protected.GET("/hello", helloHandler)
+
+	budgetRepo := repositories.NewBudgetRepository(db)
+	transactionClient := transaction.NewUnavailableClient()
+	budgetService := services.NewBudgetService(budgetRepo, transactionClient)
+	budgets := newBudgetHandler(budgetService)
+
+	apiRoutes := protected.Group("/api")
+	apiRoutes.POST("/budgets", budgets.createBudget)
+	apiRoutes.GET("/budgets", budgets.listBudgets)
+	apiRoutes.GET("/budgets/status/monthly", budgets.monthlyStatus)
+	apiRoutes.GET("/budgets/status/category-wise", budgets.categoryWiseStatus)
+	apiRoutes.GET("/budgets/:id", budgets.getBudget)
+	apiRoutes.PATCH("/budgets/:id", budgets.updateBudget)
+	apiRoutes.DELETE("/budgets/:id", budgets.deleteBudget)
+	apiRoutes.GET("/budgets/:id/usage", budgets.budgetUsage)
+
+	apiRoutes.POST("/budgets/:id/categories", budgets.createCategory)
+	apiRoutes.GET("/budgets/:id/categories", budgets.listCategories)
+	apiRoutes.PATCH("/budgets/:id/categories/:category_id", budgets.updateCategory)
+	apiRoutes.DELETE("/budgets/:id/categories/:category_id", budgets.deleteCategory)
+
+	apiRoutes.POST("/budgets/:id/alert-rules", budgets.createAlertRule)
+	apiRoutes.GET("/budgets/:id/alert-rules", budgets.listAlertRules)
+	apiRoutes.PATCH("/budgets/:id/alert-rules/:rule_id", budgets.updateAlertRule)
+	apiRoutes.DELETE("/budgets/:id/alert-rules/:rule_id", budgets.deleteAlertRule)
 
 	return router
 }
@@ -57,64 +80,16 @@ func healthHandler(ctx *gin.Context) {
 	})
 }
 
-func helloHandler(cfg config.Config, logger *slog.Logger) gin.HandlerFunc {
-	client := &http.Client{Timeout: 5 * time.Second}
-
-	return func(ctx *gin.Context) {
-		authHeader := strings.TrimSpace(ctx.GetHeader("Authorization"))
-		if authHeader == "" {
-			unauthenticatedResponse(ctx)
-			return
-		}
-
-		req, err := http.NewRequestWithContext(ctx.Request.Context(), http.MethodGet, strings.TrimRight(cfg.AuthServiceURL, "/")+"/auth/me", nil)
-		if err != nil {
-			logger.Error("failed to create auth service request", "error", err)
-			ctx.JSON(http.StatusInternalServerError, gin.H{
-				"message": "failed to verify authentication",
-				"service": "budget-service",
-			})
-			return
-		}
-		req.Header.Set("Authorization", authHeader)
-
-		resp, err := client.Do(req)
-		if err != nil {
-			logger.Error("failed to call auth service", "error", err, "auth_service_url", cfg.AuthServiceURL)
-			ctx.JSON(http.StatusBadGateway, gin.H{
-				"message": "failed to verify authentication",
-				"service": "budget-service",
-			})
-			return
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			unauthenticatedResponse(ctx)
-			return
-		}
-
-		var authResp authUserResponse
-		if err := json.NewDecoder(resp.Body).Decode(&authResp); err != nil {
-			logger.Error("failed to decode auth service response", "error", err)
-			ctx.JSON(http.StatusBadGateway, gin.H{
-				"message": "failed to verify authentication",
-				"service": "budget-service",
-			})
-			return
-		}
-
-		fullName := strings.TrimSpace(authResp.User.FirstName + " " + authResp.User.LastName)
-		ctx.JSON(http.StatusOK, gin.H{
-			"message": "hello " + fullName,
-			"service": "budget-service",
-		})
-	}
+func helloHandler(ctx *gin.Context) {
+	ctx.JSON(http.StatusOK, gin.H{
+		"message": "hello",
+		"service": "budget-service",
+	})
 }
 
 func unauthenticatedResponse(ctx *gin.Context) {
 	ctx.JSON(http.StatusUnauthorized, gin.H{
-		"message": "fuck you you are not authentivated",
-		"service": "budget-service",
+		"success": false,
+		"message": "Authentication required",
 	})
 }
