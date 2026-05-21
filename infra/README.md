@@ -1,6 +1,6 @@
-# Local database stack
+# Local service stack
 
-This compose stack runs one isolated PostgreSQL database and one PgBouncer pooler for each backend service.
+This compose stack runs the backend services behind a local Caddy gateway, plus one isolated PostgreSQL database and one PgBouncer pooler for each service.
 
 ## Start
 
@@ -9,6 +9,26 @@ cd infra
 cp .env.example .env
 docker compose up -d
 ```
+
+## Public entrypoints
+
+Use the gateway instead of calling services directly:
+
+| Protocol | URL |
+| --- | --- |
+| HTTP | `http://127.0.0.1:8080` |
+| HTTPS with Caddy internal CA | `https://127.0.0.1:8443` |
+
+For local HTTPS testing with curl, use `-k` unless you install Caddy's local CA certificate.
+
+## Gateway routes
+
+| Path | Upstream |
+| --- | --- |
+| `/auth/*` | `auth-service:8000` |
+| `/api/budgets*` | `budget-service:8001` |
+| `/api/reports*` | `report-service:8003` |
+| `/api/*` | `transaction-service:8002` |
 
 ## Service connection targets
 
@@ -21,13 +41,14 @@ Applications running inside the compose network should connect through PgBouncer
 | Report | `report-pgbouncer` | `6432` | `report_service_db` |
 | Transaction | `transaction-pgbouncer` | `6432` | `transaction_service_db` |
 
-From the host machine, use ports `6432`, `6433`, `6434`, and `6435` respectively.
+Database and service ports are intentionally private to the compose network. Use the gateway for application traffic. If you need host DB access during development, add a local-only compose override instead of publishing DB ports in the shared compose file.
 
 ## Notes
 
 - Each service has its own database, user, volume, and PgBouncer instance.
 - Application traffic should go to PgBouncer, not directly to PostgreSQL.
 - PgBouncer uses transaction pooling, which is the usual default for web APIs.
-- PgBouncer config is generated from compose environment variables, so database names, users, and passwords stay in one place.
-- `.env` is for local development only and should not be committed. For production, use Docker secrets, Kubernetes secrets, or a deployment-specific secret manager.
+- Compose now requires passwords and service secrets from `.env`; default production-like passwords are not embedded in the shared compose file.
+- `.env` is for local development only and should not be committed. For production, use Docker secrets, Kubernetes secrets, AWS Secrets Manager, SSM Parameter Store, or another deployment-specific secret manager.
 - Plain PgBouncer auth is acceptable for this local Docker network baseline. For production, enable TLS and use a secret-managed PgBouncer userlist or SCRAM-compatible deployment flow.
+- Caddy's `tls internal` is suitable for local HTTPS. For public production HTTPS, configure a real domain and ACME issuer or provide certificates from your platform load balancer.

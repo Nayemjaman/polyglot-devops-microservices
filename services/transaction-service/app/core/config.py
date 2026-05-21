@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     database_echo: bool
     database_pool_size: int = Field(..., gt=0)
     database_max_overflow: int = Field(..., ge=0)
+    cors_allowed_origins: str = ""
+    rate_limit_requests: int = Field(default=120, gt=0)
+    rate_limit_window_seconds: int = Field(default=60, gt=0)
+    grpc_shared_secret: str | None = None
     storage_endpoint_url: str = Field(..., min_length=1)
     storage_region: str = Field(..., min_length=1)
     storage_access_key: str = Field(..., min_length=1)

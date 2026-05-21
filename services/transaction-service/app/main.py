@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 
 from app.api.router import api_router
 from app.core.config import Settings, get_settings
+from app.core.middleware import add_security_middleware
 from app.db.session import create_engine, create_sessionmaker
 from app.schemas.responses import ErrorResponse
 from app.storage.client import AttachmentStorage
@@ -64,6 +65,7 @@ def create_app() -> FastAPI:
     )
     app.add_exception_handler(HTTPException, http_exception_handler)
     app.add_exception_handler(RequestValidationError, validation_exception_handler)
+    add_security_middleware(app, settings)
     app.include_router(api_router)
     return app
 

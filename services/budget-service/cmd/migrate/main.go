@@ -7,7 +7,6 @@ import (
 
 	"github.com/nayem/polyglot-devops-microservices/services/budget-service/internal/config"
 	"github.com/nayem/polyglot-devops-microservices/services/budget-service/internal/database"
-	"github.com/nayem/polyglot-devops-microservices/services/budget-service/internal/transport/http"
 )
 
 func main() {
@@ -26,18 +25,8 @@ func main() {
 	}
 	defer sqlDB.Close()
 
-	if cfg.RunMigrations {
-		if err := database.AutoMigrate(db); err != nil {
-			logger.Error("failed to migrate budget database", "error", err)
-			os.Exit(1)
-		}
-	}
-
-	router := http.NewRouter(cfg, logger, db)
-
-	logger.Info("starting budget service", "address", cfg.HTTPAddr)
-	if err := router.Run(cfg.HTTPAddr); err != nil {
-		logger.Error("budget service stopped", "error", err)
+	if err := database.AutoMigrate(db); err != nil {
+		logger.Error("failed to migrate budget database", "error", err)
 		os.Exit(1)
 	}
 }

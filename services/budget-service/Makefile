@@ -7,7 +7,7 @@ include .env
 export
 endif
 
-.PHONY: run build test tidy
+.PHONY: run build test tidy migrate
 
 run:
 	$(GO_ENV) "$(GO)" run ./cmd/api
@@ -20,3 +20,6 @@ test:
 
 tidy:
 	$(GO_ENV) "$(GO)" mod tidy
+
+migrate:
+	$(GO_ENV) "$(GO)" run ./cmd/migrate

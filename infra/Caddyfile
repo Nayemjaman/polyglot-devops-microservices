@@ -1,0 +1,65 @@
+{
+	auto_https off
+}
+
+:8080 {
+	encode gzip
+
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+	}
+
+	handle /auth/* {
+		reverse_proxy auth-service:8000
+	}
+
+	handle /api/budgets* {
+		reverse_proxy budget-service:8001
+	}
+
+	handle /api/reports* {
+		reverse_proxy report-service:8003
+	}
+
+	handle /api/* {
+		reverse_proxy transaction-service:8002
+	}
+
+	handle /health {
+		respond "ok" 200
+	}
+}
+
+:8443 {
+	tls internal
+	encode gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+	}
+
+	handle /auth/* {
+		reverse_proxy auth-service:8000
+	}
+
+	handle /api/budgets* {
+		reverse_proxy budget-service:8001
+	}
+
+	handle /api/reports* {
+		reverse_proxy report-service:8003
+	}
+
+	handle /api/* {
+		reverse_proxy transaction-service:8002
+	}
+
+	handle /health {
+		respond "ok" 200
+	}
+}

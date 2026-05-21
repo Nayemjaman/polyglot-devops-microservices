@@ -12,6 +12,11 @@ type Config struct {
 	AuthServiceURL      string
 	TransactionGRPCAddr string
 	BudgetGRPCAddr      string
+	CORSAllowedOrigins  []string
+	RateLimitRequests   int
+	RateLimitWindow     time.Duration
+	RunMigrations       bool
+	GRPCSharedSecret    string
 	Database            DatabaseConfig
 }
 
@@ -29,6 +34,11 @@ func Load() Config {
 		AuthServiceURL:      getEnv("AUTH_SERVICE_URL", "http://127.0.0.1:8000"),
 		TransactionGRPCAddr: getEnv("TRANSACTION_GRPC_ADDR", "127.0.0.1:50052"),
 		BudgetGRPCAddr:      getEnv("BUDGET_GRPC_ADDR", ":50051"),
+		CORSAllowedOrigins:  getEnvList("CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"),
+		RateLimitRequests:   getEnvInt("RATE_LIMIT_REQUESTS", 120),
+		RateLimitWindow:     time.Duration(getEnvInt("RATE_LIMIT_WINDOW_SECONDS", 60)) * time.Second,
+		RunMigrations:       getEnvBool("RUN_MIGRATIONS", false),
+		GRPCSharedSecret:    getEnv("GRPC_SHARED_SECRET", ""),
 		Database: DatabaseConfig{
 			URL:             getEnv("DATABASE_URL", "postgres://budget_service_user:budget_service_password@127.0.0.1:6433/budget_service_db?sslmode=disable"),
 			MaxOpenConns:    getEnvInt("DATABASE_MAX_OPEN_CONNS", 10),
@@ -57,4 +67,34 @@ func getEnvInt(key string, fallback int) int {
 		return fallback
 	}
 	return parsed
+}
+
+func getEnvBool(key string, fallback bool) bool {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback
+	}
+	return value == "true" || value == "1" || value == "yes"
+}
+
+func getEnvList(key string, fallback string) []string {
+	raw := getEnv(key, fallback)
+	values := []string{}
+	current := ""
+	for _, char := range raw {
+		if char == ',' {
+			if current != "" {
+				values = append(values, current)
+			}
+			current = ""
+			continue
+		}
+		if char != ' ' && char != '\t' && char != '\n' {
+			current += string(char)
+		}
+	}
+	if current != "" {
+		values = append(values, current)
+	}
+	return values
 }

@@ -23,6 +23,9 @@ func NewRouter(cfg config.Config, logger *slog.Logger, db *gorm.DB) *gin.Engine 
 		logger.Error("failed to configure trusted proxies", "error", err)
 	}
 	router.Use(gin.Recovery())
+	router.Use(requestIDMiddleware())
+	router.Use(corsMiddleware(cfg.CORSAllowedOrigins))
+	router.Use(rateLimitMiddleware(cfg))
 	router.Use(requestLogger(logger))
 
 	router.GET("/health", healthHandler)
@@ -69,6 +72,7 @@ func requestLogger(logger *slog.Logger) gin.HandlerFunc {
 			"path", ctx.Request.URL.Path,
 			"status", ctx.Writer.Status(),
 			"client_ip", ctx.ClientIP(),
+			"request_id", ctx.GetString("request_id"),
 		)
 	}
 }

@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     database_echo: bool = False
     database_pool_size: int = Field(default=5, gt=0)
     database_max_overflow: int = Field(default=10, ge=0)
+    cors_allowed_origins: str = ""
+    rate_limit_requests: int = Field(default=120, gt=0)
+    rate_limit_window_seconds: int = Field(default=60, gt=0)
+    grpc_shared_secret: str | None = None
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
