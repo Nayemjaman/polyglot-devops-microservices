@@ -135,8 +135,8 @@ REST_FRAMEWORK = {
         'rest_framework.throttling.UserRateThrottle',
     ),
     'DEFAULT_THROTTLE_RATES': {
-        'anon': os.getenv('AUTH_ANON_RATE_LIMIT', '60/minute'),
-        'user': os.getenv('AUTH_USER_RATE_LIMIT', '120/minute'),
+        'anon': os.getenv('AUTH_ANON_RATE_LIMIT', '300/minute'),
+        'user': os.getenv('AUTH_USER_RATE_LIMIT', '600/minute'),
     },
 }
 

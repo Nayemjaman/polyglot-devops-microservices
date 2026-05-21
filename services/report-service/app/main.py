@@ -17,6 +17,7 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     app.state.settings = settings
     app.state.http_client = httpx.AsyncClient(timeout=settings.http_timeout_seconds)
+    app.state.auth_cache = {}
     app.state.db_engine = create_engine(settings)
     app.state.db_sessionmaker = create_sessionmaker(app.state.db_engine)
     try:

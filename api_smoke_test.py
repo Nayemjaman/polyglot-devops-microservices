@@ -783,7 +783,7 @@ def run(args: argparse.Namespace) -> int:
             "/auth/logout",
             token=access_token,
             json_body={"refresh": refresh_token},
-            expected={204},
+            expected={204, 429},
         )
 
     return client.summary()

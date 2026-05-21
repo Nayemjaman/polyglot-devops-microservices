@@ -1,5 +1,6 @@
 import uuid
 from collections.abc import AsyncGenerator
+from datetime import datetime, timedelta, timezone
 
 from fastapi import Header, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,6 +24,12 @@ async def get_current_user_id(
             detail={"message": "Authentication required"},
         )
 
+    cache = request.app.state.auth_cache
+    cached = cache.get(authorization)
+    now = datetime.now(timezone.utc)
+    if cached and cached["expires_at"] > now:
+        return cached["user_id"]
+
     try:
         user = await get_authenticated_user(
             request.app.state.http_client,
@@ -34,4 +41,8 @@ async def get_current_user_id(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={"message": "Authentication required"},
         ) from exc
+    cache[authorization] = {
+        "user_id": user.id,
+        "expires_at": now + timedelta(seconds=30),
+    }
     return user.id
