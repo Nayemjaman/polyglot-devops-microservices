@@ -202,6 +202,38 @@ services:
       retries: 5
       start_period: 10s
 
+  report-service:
+    build:
+      context: ../services/report-service
+    container_name: report-service
+    restart: unless-stopped
+    depends_on:
+      report-pgbouncer:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    environment:
+      APP_NAME: ${REPORT_APP_NAME:-report-service}
+      APP_ENV: ${REPORT_APP_ENV:-production}
+      HOST: 0.0.0.0
+      PORT: 8003
+      AUTH_SERVICE_URL: http://auth-service:8000
+      HTTP_TIMEOUT_SECONDS: ${REPORT_HTTP_TIMEOUT_SECONDS:-5}
+      DATABASE_URL: postgresql+asyncpg://${REPORT_DB_USER:-report_service_user}:${REPORT_DB_PASSWORD:-report_service_password}@report-pgbouncer:6432/${REPORT_DB_NAME:-report_service_db}?prepared_statement_cache_size=0
+      DATABASE_ECHO: ${REPORT_DATABASE_ECHO:-False}
+      DATABASE_POOL_SIZE: ${REPORT_DATABASE_POOL_SIZE:-5}
+      DATABASE_MAX_OVERFLOW: ${REPORT_DATABASE_MAX_OVERFLOW:-10}
+    ports:
+      - "8003:8003"
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import socket; s=socket.create_connection(('127.0.0.1', 8003), 3); s.close()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
   transaction-postgres:
     <<: *postgres-common
     container_name: transaction-postgres

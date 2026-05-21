@@ -17,6 +17,7 @@ from urllib import error, parse, request
 AUTH_BASE_URL = os.getenv("AUTH_BASE_URL", "http://127.0.0.1:8000")
 TRANSACTION_BASE_URL = os.getenv("TRANSACTION_BASE_URL", "http://127.0.0.1:8002")
 BUDGET_BASE_URL = os.getenv("BUDGET_BASE_URL", "http://127.0.0.1:8081")
+REPORT_BASE_URL = os.getenv("REPORT_BASE_URL", "http://127.0.0.1:8003")
 TIMEOUT_SECONDS = float(os.getenv("API_SMOKE_TIMEOUT", "10"))
 
 
@@ -653,6 +654,127 @@ def run(args: argparse.Namespace) -> int:
             )
         client.request("delete budget", "DELETE", args.budget_url, f"/api/budgets/{budget_id}", token=access_token)
 
+    report_year = smoke_budget_year
+    report_month = smoke_budget_month
+    client.request("report health", "GET", args.report_url, "/health")
+    client.request("report db health", "GET", args.report_url, "/health/db")
+    client.request("report hello", "GET", args.report_url, "/hello")
+    client.request(
+        "monthly report",
+        "GET",
+        args.report_url,
+        "/api/reports/monthly",
+        token=access_token,
+        query={"year": report_year, "month": report_month},
+    )
+    client.request(
+        "yearly report",
+        "GET",
+        args.report_url,
+        "/api/reports/yearly",
+        token=access_token,
+        query={"year": report_year},
+    )
+    client.request(
+        "income vs expense report",
+        "GET",
+        args.report_url,
+        "/api/reports/income-vs-expense",
+        token=access_token,
+        query={"year": report_year, "month": report_month},
+    )
+    client.request(
+        "category-wise report",
+        "GET",
+        args.report_url,
+        "/api/reports/category-wise",
+        token=access_token,
+        query={"year": report_year, "month": report_month, "type": "EXPENSE"},
+    )
+    client.request(
+        "wallet-wise report",
+        "GET",
+        args.report_url,
+        "/api/reports/wallet-wise",
+        token=access_token,
+        query={"year": report_year, "month": report_month},
+    )
+    client.request(
+        "budget performance report",
+        "GET",
+        args.report_url,
+        "/api/reports/budget-performance",
+        token=access_token,
+        query={"year": report_year, "month": report_month},
+    )
+    client.request(
+        "savings report",
+        "GET",
+        args.report_url,
+        "/api/reports/savings",
+        token=access_token,
+        query={"year": report_year, "month": report_month},
+    )
+    client.request(
+        "dashboard report",
+        "GET",
+        args.report_url,
+        "/api/reports/dashboard",
+        token=access_token,
+        query={"year": report_year, "month": report_month},
+    )
+    client.request(
+        "dashboard monthly summary",
+        "GET",
+        args.report_url,
+        "/api/reports/dashboard/monthly-summary",
+        token=access_token,
+        query={"year": report_year},
+    )
+    export_job = client.request(
+        "create report export",
+        "POST",
+        args.report_url,
+        "/api/reports/export",
+        token=access_token,
+        json_body={
+            "report_type": "MONTHLY",
+            "export_type": "PDF",
+            "year": report_year,
+            "month": report_month,
+        },
+        expected={201},
+    )
+    export_job_id = None
+    if export_job:
+        data = export_job.get("data")
+        if isinstance(data, dict):
+            export_job_id = data.get("export_job_id")
+    client.request(
+        "list report export jobs",
+        "GET",
+        args.report_url,
+        "/api/reports/export-jobs",
+        token=access_token,
+        query={"page": 1, "page_size": 20, "status": "PENDING", "export_type": "PDF"},
+    )
+    if export_job_id:
+        client.request(
+            "get report export job",
+            "GET",
+            args.report_url,
+            f"/api/reports/export-jobs/{export_job_id}",
+            token=access_token,
+        )
+    client.request(
+        "download missing report file",
+        "GET",
+        args.report_url,
+        f"/api/reports/files/{uuid.uuid4()}/download",
+        token=access_token,
+        expected={404},
+    )
+
     if refresh_token:
         client.request(
             "auth logout",
@@ -678,6 +800,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         help=f"Transaction service URL. Default: {TRANSACTION_BASE_URL}",
     )
     parser.add_argument("--budget-url", default=BUDGET_BASE_URL, help=f"Budget service URL. Default: {BUDGET_BASE_URL}")
+    parser.add_argument("--report-url", default=REPORT_BASE_URL, help=f"Report service URL. Default: {REPORT_BASE_URL}")
     return parser.parse_args(argv)
 
 
