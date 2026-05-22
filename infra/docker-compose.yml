@@ -1,8 +1,26 @@
 name: polyglot-devops-microservices
 
+x-default-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-app-runtime: &app-runtime
+  init: true
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  read_only: true
+  tmpfs:
+    - /tmp:size=64m,mode=1777
+  logging: *default-logging
+
 x-postgres-common: &postgres-common
   image: postgres:16-alpine
   restart: unless-stopped
+  logging: *default-logging
   healthcheck:
     test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
     interval: 10s
@@ -15,6 +33,7 @@ x-postgres-common: &postgres-common
 x-pgbouncer-common: &pgbouncer-common
   image: edoburu/pgbouncer:v1.25.1-p0
   restart: unless-stopped
+  logging: *default-logging
   networks:
     - backend
 
@@ -23,6 +42,7 @@ services:
     image: caddy:2.8-alpine
     container_name: gateway
     restart: unless-stopped
+    logging: *default-logging
     depends_on:
       auth-service:
         condition: service_healthy
@@ -48,7 +68,7 @@ services:
     environment:
       POSTGRES_DB: ${AUTH_DB_NAME:-auth_service_db}
       POSTGRES_USER: ${AUTH_DB_USER:-auth_service_user}
-      POSTGRES_PASSWORD: ${AUTH_DB_PASSWORD:-auth_service_password}
+      POSTGRES_PASSWORD: ${AUTH_DB_PASSWORD:?AUTH_DB_PASSWORD is required}
     volumes:
       - auth-postgres-data:/var/lib/postgresql/data
 
@@ -59,7 +79,7 @@ services:
       auth-postgres:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://${AUTH_DB_USER:-auth_service_user}:${AUTH_DB_PASSWORD:-auth_service_password}@auth-postgres:5432/${AUTH_DB_NAME:-auth_service_db}
+      DATABASE_URL: postgresql://${AUTH_DB_USER:-auth_service_user}:${AUTH_DB_PASSWORD:?AUTH_DB_PASSWORD is required}@auth-postgres:5432/${AUTH_DB_NAME:-auth_service_db}
       LISTEN_PORT: 6432
       AUTH_TYPE: plain
       POOL_MODE: transaction
@@ -79,6 +99,7 @@ services:
       start_period: 10s
 
   auth-service:
+    <<: *app-runtime
     build:
       context: ../services/auth-service
     container_name: auth-service
@@ -86,6 +107,8 @@ services:
     depends_on:
       auth-pgbouncer:
         condition: service_healthy
+      auth-migrate:
+        condition: service_completed_successfully
     environment:
       DJANGO_DEBUG: ${AUTH_DJANGO_DEBUG:-False}
       DJANGO_SECRET_KEY: ${AUTH_DJANGO_SECRET_KEY:?AUTH_DJANGO_SECRET_KEY is required}
@@ -117,6 +140,33 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s
+
+  auth-migrate:
+    <<: *app-runtime
+    build:
+      context: ../services/auth-service
+    container_name: auth-migrate
+    restart: "no"
+    depends_on:
+      auth-pgbouncer:
+        condition: service_healthy
+    environment:
+      DJANGO_DEBUG: ${AUTH_DJANGO_DEBUG:-False}
+      DJANGO_SECRET_KEY: ${AUTH_DJANGO_SECRET_KEY:?AUTH_DJANGO_SECRET_KEY is required}
+      DJANGO_ALLOWED_HOSTS: ${AUTH_DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,auth-service}
+      CORS_ALLOWED_ORIGINS: ${AUTH_CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      POSTGRES_DB: ${AUTH_DB_NAME:-auth_service_db}
+      POSTGRES_USER: ${AUTH_DB_USER:-auth_service_user}
+      POSTGRES_PASSWORD: ${AUTH_DB_PASSWORD:?AUTH_DB_PASSWORD is required}
+      POSTGRES_HOST: auth-pgbouncer
+      POSTGRES_PORT: 6432
+    command:
+      - python
+      - manage.py
+      - migrate
+      - --noinput
+    networks:
+      - backend
 
   budget-postgres:
     <<: *postgres-common
@@ -155,6 +205,7 @@ services:
       start_period: 10s
 
   budget-service:
+    <<: *app-runtime
     build:
       context: ../services/budget-service
     container_name: budget-service
@@ -164,6 +215,8 @@ services:
         condition: service_healthy
       auth-service:
         condition: service_healthy
+      budget-migrate:
+        condition: service_completed_successfully
     environment:
       APP_ENV: ${BUDGET_APP_ENV:-production}
       HTTP_ADDR: :8001
@@ -188,6 +241,26 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s
+
+  budget-migrate:
+    <<: *app-runtime
+    build:
+      context: ../services/budget-service
+    container_name: budget-migrate
+    restart: "no"
+    depends_on:
+      budget-pgbouncer:
+        condition: service_healthy
+    environment:
+      APP_ENV: ${BUDGET_APP_ENV:-production}
+      DATABASE_URL: postgres://${BUDGET_DB_USER:-budget_service_user}:${BUDGET_DB_PASSWORD:?BUDGET_DB_PASSWORD is required}@budget-pgbouncer:6432/${BUDGET_DB_NAME:-budget_service_db}?sslmode=disable
+      DATABASE_MAX_OPEN_CONNS: ${BUDGET_DATABASE_MAX_OPEN_CONNS:-10}
+      DATABASE_MAX_IDLE_CONNS: ${BUDGET_DATABASE_MAX_IDLE_CONNS:-5}
+      DATABASE_CONN_MAX_LIFETIME_SECONDS: ${BUDGET_DATABASE_CONN_MAX_LIFETIME_SECONDS:-300}
+    command:
+      - /app/budget-migrate
+    networks:
+      - backend
 
   report-postgres:
     <<: *postgres-common
@@ -226,6 +299,7 @@ services:
       start_period: 10s
 
   report-service:
+    <<: *app-runtime
     build:
       context: ../services/report-service
     container_name: report-service
@@ -233,6 +307,8 @@ services:
     depends_on:
       report-pgbouncer:
         condition: service_healthy
+      report-migrate:
+        condition: service_completed_successfully
       auth-service:
         condition: service_healthy
     environment:
@@ -258,6 +334,35 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s
+
+  report-migrate:
+    <<: *app-runtime
+    build:
+      context: ../services/report-service
+    container_name: report-migrate
+    restart: "no"
+    depends_on:
+      report-pgbouncer:
+        condition: service_healthy
+    environment:
+      APP_NAME: ${REPORT_APP_NAME:-report-service}
+      APP_ENV: ${REPORT_APP_ENV:-production}
+      HOST: 0.0.0.0
+      PORT: 8003
+      AUTH_SERVICE_URL: http://auth-service:8000
+      HTTP_TIMEOUT_SECONDS: ${REPORT_HTTP_TIMEOUT_SECONDS:-5}
+      DATABASE_URL: postgresql+asyncpg://${REPORT_DB_USER:-report_service_user}:${REPORT_DB_PASSWORD:?REPORT_DB_PASSWORD is required}@report-pgbouncer:6432/${REPORT_DB_NAME:-report_service_db}?prepared_statement_cache_size=0
+      CORS_ALLOWED_ORIGINS: ${REPORT_CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      GRPC_SHARED_SECRET: ${REPORT_GRPC_SHARED_SECRET:?REPORT_GRPC_SHARED_SECRET is required}
+      DATABASE_ECHO: ${REPORT_DATABASE_ECHO:-False}
+      DATABASE_POOL_SIZE: ${REPORT_DATABASE_POOL_SIZE:-5}
+      DATABASE_MAX_OVERFLOW: ${REPORT_DATABASE_MAX_OVERFLOW:-10}
+    command:
+      - alembic
+      - upgrade
+      - head
+    networks:
+      - backend
 
   transaction-postgres:
     <<: *postgres-common
@@ -299,6 +404,7 @@ services:
     image: minio/minio:RELEASE.2025-04-22T22-12-26Z
     container_name: transaction-minio
     restart: unless-stopped
+    logging: *default-logging
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${TRANSACTION_STORAGE_ACCESS_KEY:?TRANSACTION_STORAGE_ACCESS_KEY is required}
@@ -318,6 +424,7 @@ services:
       start_period: 10s
 
   transaction-minio-init:
+    logging: *default-logging
     image: minio/mc:RELEASE.2025-04-16T18-13-26Z
     container_name: transaction-minio-init
     depends_on:
@@ -337,6 +444,7 @@ services:
       - backend
 
   transaction-service:
+    <<: *app-runtime
     build:
       context: ../services/transaction-service
     container_name: transaction-service
@@ -344,6 +452,8 @@ services:
     depends_on:
       transaction-pgbouncer:
         condition: service_healthy
+      transaction-migrate:
+        condition: service_completed_successfully
       auth-service:
         condition: service_healthy
       transaction-minio-init:
@@ -378,6 +488,42 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s
+
+  transaction-migrate:
+    <<: *app-runtime
+    build:
+      context: ../services/transaction-service
+    container_name: transaction-migrate
+    restart: "no"
+    depends_on:
+      transaction-pgbouncer:
+        condition: service_healthy
+    environment:
+      APP_NAME: ${TRANSACTION_APP_NAME:-transaction-service}
+      APP_ENV: ${TRANSACTION_APP_ENV:-production}
+      HOST: 0.0.0.0
+      PORT: 8002
+      AUTH_SERVICE_URL: http://auth-service:8000
+      HTTP_TIMEOUT_SECONDS: ${TRANSACTION_HTTP_TIMEOUT_SECONDS:-5}
+      DATABASE_URL: postgresql+asyncpg://${TRANSACTION_DB_USER:-transaction_service_user}:${TRANSACTION_DB_PASSWORD:?TRANSACTION_DB_PASSWORD is required}@transaction-pgbouncer:6432/${TRANSACTION_DB_NAME:-transaction_service_db}?prepared_statement_cache_size=0
+      CORS_ALLOWED_ORIGINS: ${TRANSACTION_CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      GRPC_SHARED_SECRET: ${TRANSACTION_GRPC_SHARED_SECRET:?TRANSACTION_GRPC_SHARED_SECRET is required}
+      DATABASE_ECHO: ${TRANSACTION_DATABASE_ECHO:-False}
+      DATABASE_POOL_SIZE: ${TRANSACTION_DATABASE_POOL_SIZE:-5}
+      DATABASE_MAX_OVERFLOW: ${TRANSACTION_DATABASE_MAX_OVERFLOW:-10}
+      STORAGE_ENDPOINT_URL: http://transaction-minio:9000
+      STORAGE_REGION: ${TRANSACTION_STORAGE_REGION:-us-east-1}
+      STORAGE_ACCESS_KEY: ${TRANSACTION_STORAGE_ACCESS_KEY:?TRANSACTION_STORAGE_ACCESS_KEY is required}
+      STORAGE_SECRET_KEY: ${TRANSACTION_STORAGE_SECRET_KEY:?TRANSACTION_STORAGE_SECRET_KEY is required}
+      STORAGE_BUCKET_NAME: ${TRANSACTION_STORAGE_BUCKET_NAME:-transaction-attachments}
+      STORAGE_PUBLIC_BASE_URL: ${TRANSACTION_STORAGE_PUBLIC_BASE_URL:-http://127.0.0.1:9000}
+      STORAGE_PATH_PREFIX: ${TRANSACTION_STORAGE_PATH_PREFIX:-attachments}
+    command:
+      - alembic
+      - upgrade
+      - head
+    networks:
+      - backend
 
 networks:
   backend:

@@ -1,4 +1,8 @@
 .git/
+.cache/
+.tools/
+.agents/
+.codex/
 bin/
 tmp/
 .env
