@@ -1,7 +1,7 @@
 import uuid
 from datetime import date
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Header, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import get_current_user_id, get_db_session, get_event_publisher
@@ -11,6 +11,7 @@ from app.schemas.pagination import PaginationParams
 from app.schemas.responses import ApiResponse, PaginatedResponse
 from app.schemas.transactions import TransactionCreate, TransactionUpdate
 from app.services import summaries as summary_service
+from app.services import idempotency as idempotency_service
 from app.services import transactions as transaction_service
 from app.services.exceptions import ServiceError
 
@@ -20,14 +21,35 @@ router = APIRouter(prefix="/api/transactions", tags=["transactions"])
 @router.post("", response_model=ApiResponse, status_code=status.HTTP_201_CREATED)
 async def create_transaction(
     payload: TransactionCreate,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
     user_id: uuid.UUID = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_db_session),
     event_publisher=Depends(get_event_publisher),
 ) -> ApiResponse:
+    existing = await idempotency_service.get_record(
+        session,
+        user_id,
+        "POST /api/transactions",
+        idempotency_key,
+        payload.model_dump(mode="json"),
+    )
+    if existing is not None:
+        transaction = await transaction_service.get_transaction(session, user_id, existing.resource_id)
+        return ApiResponse(message="Transaction fetched from idempotency record", data=transaction_to_out(transaction))
+
     try:
         transaction = await transaction_service.create_transaction(session, user_id, payload)
     except ServiceError as exc:
         raise_service_error(exc)
+    await idempotency_service.save_record(
+        session,
+        user_id,
+        "POST /api/transactions",
+        idempotency_key,
+        payload.model_dump(mode="json"),
+        "transaction",
+        transaction.id,
+    )
     message = (
         "Transfer transaction created successfully"
         if payload.type == "TRANSFER"

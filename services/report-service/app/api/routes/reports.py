@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import APIRouter, Depends, Header, Query, Request, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,6 +10,7 @@ from app.repositories.reports import ReportRepository
 from app.schemas.pagination import PaginationParams
 from app.schemas.reports import ExportRequest
 from app.schemas.responses import ApiResponse, PaginatedResponse
+from app.services import idempotency as idempotency_service
 from app.services.exceptions import ServiceError
 from app.services.reports import ReportService
 
@@ -136,15 +137,36 @@ async def dashboard_monthly_summary(
 async def create_export_job(
     request: Request,
     payload: ExportRequest,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
     user_id: uuid.UUID = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> ApiResponse:
+    existing = await idempotency_service.get_record(
+        session,
+        user_id,
+        "POST /api/reports/export",
+        idempotency_key,
+        payload.model_dump(mode="json"),
+    )
+    if existing is not None:
+        data = await get_report_service(session).get_export_created(user_id, existing.resource_id)
+        return ApiResponse(message="Report export job fetched from idempotency record", data=data)
+
     try:
         data = await get_report_service(session).create_export_job(user_id, payload)
     except ServiceError as exc:
         await session.rollback()
         raise_service_error(exc)
     await session.commit()
+    await idempotency_service.save_record(
+        session,
+        user_id,
+        "POST /api/reports/export",
+        idempotency_key,
+        payload.model_dump(mode="json"),
+        "report_export_job",
+        data.export_job_id,
+    )
     await request.app.state.event_publisher.publish(
         "report.export.requested",
         {

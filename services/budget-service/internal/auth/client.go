@@ -38,6 +38,27 @@ func NewClient(baseURL string) *Client {
 }
 
 func (c *Client) Verify(ctx context.Context, authHeader string) (User, error) {
+	var lastErr error
+	for attempt := 0; attempt < 3; attempt++ {
+		user, err := c.verifyOnce(ctx, authHeader)
+		if err == nil || err == ErrInvalidToken {
+			return user, err
+		}
+		lastErr = err
+		if attempt < 2 {
+			timer := time.NewTimer(time.Duration(100*(1<<attempt)) * time.Millisecond)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return User{}, ctx.Err()
+			case <-timer.C:
+			}
+		}
+	}
+	return User{}, lastErr
+}
+
+func (c *Client) verifyOnce(ctx context.Context, authHeader string) (User, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/auth/me", nil)
 	if err != nil {
 		return User{}, fmt.Errorf("create auth request: %w", err)
@@ -51,6 +72,9 @@ func (c *Client) Verify(ctx context.Context, authHeader string) (User, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		if resp.StatusCode >= 500 {
+			return User{}, fmt.Errorf("auth service returned status %d", resp.StatusCode)
+		}
 		return User{}, ErrInvalidToken
 	}
 

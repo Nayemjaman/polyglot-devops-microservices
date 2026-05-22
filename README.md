@@ -1,4 +1,4 @@
 # polyglot-devops-microservices
-Django rest framework + FastAPI + Go + .NET | Docker | CI/CD | Kubernetes | AWS
+Django rest framework + FastAPI + Go + | Docker | CI/CD | Kubernetes | AWS
 
 

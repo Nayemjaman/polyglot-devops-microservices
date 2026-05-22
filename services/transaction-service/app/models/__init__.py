@@ -1,5 +1,6 @@
 from app.models.attachment import Attachment
 from app.models.category import Category
+from app.models.idempotency import IdempotencyRecord
 from app.models.payment_method import PaymentMethod
 from app.models.recurring_transaction import RecurringTransaction
 from app.models.tag import Tag
@@ -11,6 +12,7 @@ __all__ = [
     "Attachment",
     "Category",
     "PaymentMethod",
+    "IdempotencyRecord",
     "RecurringTransaction",
     "Tag",
     "Transaction",

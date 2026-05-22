@@ -217,6 +217,19 @@ class ReportService:
             raise NotFoundError("Export job not found")
         return self._job_out(job, include_user=True)
 
+    async def get_export_created(self, user_id: uuid.UUID, job_id: uuid.UUID) -> ExportCreatedOut:
+        job = await self.repo.get_export_job(user_id, job_id)
+        if job is None:
+            raise NotFoundError("Export job not found")
+        return ExportCreatedOut(
+            export_job_id=job.id,
+            report_snapshot_id=job.report_snapshot_id,
+            report_type=job.report_snapshot.report_type,
+            export_type=job.export_type,
+            status=job.status,
+            requested_at=job.requested_at,
+        )
+
     async def get_file(self, user_id: uuid.UUID, file_id: uuid.UUID):
         file = await self.repo.get_file(user_id, file_id)
         if file is None:
