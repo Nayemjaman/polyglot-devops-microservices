@@ -41,6 +41,7 @@ func (h *budgetHandler) listBudgets(ctx *gin.Context) {
 		Year:     optionalQueryInt(ctx, "year"),
 		Month:    optionalQueryInt(ctx, "month"),
 		Status:   optionalQueryString(ctx, "status"),
+		Search:   optionalQueryString(ctx, "search"),
 	}
 	out, pagination, err := h.service.ListBudgets(ctx.Request.Context(), currentUserID(ctx), filters)
 	if err != nil {

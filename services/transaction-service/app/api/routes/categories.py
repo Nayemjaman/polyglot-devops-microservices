@@ -33,11 +33,12 @@ async def list_categories(
     page_size: int = Query(default=20, ge=1, le=100),
     type: str | None = None,
     is_active: bool | None = None,
+    search: str | None = None,
     user_id: uuid.UUID = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> PaginatedResponse:
     pagination = PaginationParams(page=page, page_size=page_size)
-    categories, total = await category_service.list_categories(session, user_id, pagination, type, is_active)
+    categories, total = await category_service.list_categories(session, user_id, pagination, type, is_active, search)
     return PaginatedResponse(
         message="Categories fetched successfully",
         data=[CategoryOut.model_validate(category) for category in categories],

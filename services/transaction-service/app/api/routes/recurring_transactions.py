@@ -37,6 +37,7 @@ async def list_recurring_transactions(
     page_size: int = Query(default=20, ge=1, le=100),
     frequency: str | None = None,
     is_active: bool | None = None,
+    search: str | None = None,
     user_id: uuid.UUID = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> PaginatedResponse:
@@ -47,6 +48,7 @@ async def list_recurring_transactions(
         pagination,
         frequency=frequency,
         is_active=is_active,
+        search=search,
     )
     return PaginatedResponse(
         message="Recurring transactions fetched successfully",

@@ -27,6 +27,21 @@ http://:8080 {
 		reverse_proxy transaction-service:8002
 	}
 
+	handle /status/transaction/* {
+		uri strip_prefix /status/transaction
+		reverse_proxy transaction-service:8002
+	}
+
+	handle /status/report/* {
+		uri strip_prefix /status/report
+		reverse_proxy report-service:8003
+	}
+
+	handle /status/budget/* {
+		uri strip_prefix /status/budget
+		reverse_proxy budget-service:8001
+	}
+
 	handle /health {
 		respond "ok" 200
 	}
@@ -57,6 +72,21 @@ https://localhost:8443, https://127.0.0.1:8443 {
 
 	handle /api/* {
 		reverse_proxy transaction-service:8002
+	}
+
+	handle /status/transaction/* {
+		uri strip_prefix /status/transaction
+		reverse_proxy transaction-service:8002
+	}
+
+	handle /status/report/* {
+		uri strip_prefix /status/report
+		reverse_proxy report-service:8003
+	}
+
+	handle /status/budget/* {
+		uri strip_prefix /status/budget
+		reverse_proxy budget-service:8001
 	}
 
 	handle /health {

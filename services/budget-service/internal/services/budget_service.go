@@ -51,6 +51,7 @@ type BudgetListFilters struct {
 	Year     *int
 	Month    *int
 	Status   *string
+	Search   *string
 }
 
 type CreateCategoryInput struct {
@@ -207,7 +208,7 @@ func (s *BudgetService) ListBudgets(ctx context.Context, userID uuid.UUID, filte
 		}
 	}
 
-	budgets, total, err := s.repo.List(ctx, userID, repositories.BudgetFilters{Year: filters.Year, Month: filters.Month, Status: filters.Status}, page, pageSize)
+	budgets, total, err := s.repo.List(ctx, userID, repositories.BudgetFilters{Year: filters.Year, Month: filters.Month, Status: filters.Status, Search: filters.Search}, page, pageSize)
 	if err != nil {
 		return nil, api.Pagination{}, err
 	}

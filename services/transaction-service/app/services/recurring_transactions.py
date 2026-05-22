@@ -54,6 +54,7 @@ async def list_recurring_transactions(
     pagination: PaginationParams,
     frequency: str | None = None,
     is_active: bool | None = None,
+    search: str | None = None,
 ) -> tuple[list[RecurringTransaction], int]:
     statement = (
         select(RecurringTransaction)
@@ -65,6 +66,9 @@ async def list_recurring_transactions(
         statement = statement.where(RecurringTransaction.frequency == frequency)
     if is_active is not None:
         statement = statement.where(RecurringTransaction.is_active.is_(is_active))
+    if search:
+        pattern = f"%{search.strip()}%"
+        statement = statement.where(RecurringTransaction.title.ilike(pattern))
     return await paginate(session, statement, pagination)
 
 

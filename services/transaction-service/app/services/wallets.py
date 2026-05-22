@@ -44,12 +44,15 @@ async def list_wallets(
     pagination: PaginationParams,
     wallet_type: str | None = None,
     is_active: bool | None = None,
+    search: str | None = None,
 ) -> tuple[list[Wallet], int]:
     statement = select(Wallet).where(Wallet.user_id == user_id).order_by(Wallet.created_at.desc())
     if wallet_type:
         statement = statement.where(Wallet.type == wallet_type)
     if is_active is not None:
         statement = statement.where(Wallet.is_active.is_(is_active))
+    if search:
+        statement = statement.where(Wallet.name.ilike(f"%{search.strip()}%"))
     return await paginate(session, statement, pagination)
 
 

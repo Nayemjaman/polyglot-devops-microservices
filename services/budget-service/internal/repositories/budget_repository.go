@@ -13,6 +13,7 @@ type BudgetFilters struct {
 	Year   *int
 	Month  *int
 	Status *string
+	Search *string
 }
 
 type BudgetRepository struct {
@@ -164,6 +165,9 @@ func applyBudgetFilters(query *gorm.DB, filters BudgetFilters) *gorm.DB {
 	}
 	if filters.Status != nil {
 		query = query.Where("status = ?", *filters.Status)
+	}
+	if filters.Search != nil && *filters.Search != "" {
+		query = query.Where("LOWER(name) LIKE LOWER(?)", "%"+*filters.Search+"%")
 	}
 	return query
 }

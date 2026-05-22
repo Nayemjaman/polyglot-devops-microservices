@@ -31,12 +31,15 @@ async def list_categories(
     pagination: PaginationParams,
     category_type: str | None = None,
     is_active: bool | None = None,
+    search: str | None = None,
 ) -> tuple[list[Category], int]:
     statement = select(Category).where(Category.user_id == user_id).order_by(Category.created_at.desc())
     if category_type:
         statement = statement.where(Category.type == category_type)
     if is_active is not None:
         statement = statement.where(Category.is_active.is_(is_active))
+    if search:
+        statement = statement.where(Category.name.ilike(f"%{search.strip()}%"))
     return await paginate(session, statement, pagination)
 
 

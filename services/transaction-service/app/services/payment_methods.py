@@ -25,6 +25,7 @@ async def list_payment_methods(
     pagination: PaginationParams,
     method_type: str | None = None,
     is_active: bool | None = None,
+    search: str | None = None,
 ) -> tuple[list[PaymentMethod], int]:
     statement = select(PaymentMethod).where(PaymentMethod.user_id == user_id).order_by(
         PaymentMethod.created_at.desc()
@@ -33,6 +34,8 @@ async def list_payment_methods(
         statement = statement.where(PaymentMethod.type == method_type)
     if is_active is not None:
         statement = statement.where(PaymentMethod.is_active.is_(is_active))
+    if search:
+        statement = statement.where(PaymentMethod.name.ilike(f"%{search.strip()}%"))
     return await paginate(session, statement, pagination)
 
 

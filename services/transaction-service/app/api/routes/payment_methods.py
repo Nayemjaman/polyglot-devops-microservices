@@ -36,15 +36,32 @@ async def list_payment_methods(
     page_size: int = Query(default=20, ge=1, le=100),
     type: str | None = None,
     is_active: bool | None = None,
+    search: str | None = None,
     user_id: uuid.UUID = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> PaginatedResponse:
     pagination = PaginationParams(page=page, page_size=page_size)
-    methods, total = await payment_method_service.list_payment_methods(session, user_id, pagination, type, is_active)
+    methods, total = await payment_method_service.list_payment_methods(session, user_id, pagination, type, is_active, search)
     return PaginatedResponse(
         message="Payment methods fetched successfully",
         data=[PaymentMethodOut.model_validate(method) for method in methods],
         pagination=pagination.to_response(total),
+    )
+
+
+@router.get("/{method_id}", response_model=ApiResponse)
+async def get_payment_method(
+    method_id: uuid.UUID,
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> ApiResponse:
+    try:
+        method = await payment_method_service.get_payment_method(session, user_id, method_id)
+    except ServiceError as exc:
+        raise_service_error(exc)
+    return ApiResponse(
+        message="Payment method fetched successfully",
+        data=PaymentMethodOut.model_validate(method),
     )
 
 
