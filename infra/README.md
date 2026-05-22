@@ -21,6 +21,17 @@ Use the gateway instead of calling services directly:
 
 For local HTTPS testing with curl, use `-k` unless you install Caddy's local CA certificate.
 
+## API smoke test
+
+The root `api_smoke_test.py` script calls each service on a direct localhost port. Start the stack with the smoke-test port override when you want to run it from the host:
+
+```bash
+cd infra
+docker compose -f docker-compose.yml -f docker-compose.smoke-ports.yml up -d
+cd ..
+python3 api_smoke_test.py --email smoke@example.com --password 'StrongPass123!'
+```
+
 ## Gateway routes
 
 | Path | Upstream |

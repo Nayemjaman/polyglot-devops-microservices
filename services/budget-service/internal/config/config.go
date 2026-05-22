@@ -17,6 +17,9 @@ type Config struct {
 	RateLimitWindow     time.Duration
 	RunMigrations       bool
 	GRPCSharedSecret    string
+	RabbitMQURL         string
+	RabbitMQExchange    string
+	TransactionQueue    string
 	Database            DatabaseConfig
 }
 
@@ -39,6 +42,9 @@ func Load() Config {
 		RateLimitWindow:     time.Duration(getEnvInt("RATE_LIMIT_WINDOW_SECONDS", 60)) * time.Second,
 		RunMigrations:       getEnvBool("RUN_MIGRATIONS", false),
 		GRPCSharedSecret:    getEnv("GRPC_SHARED_SECRET", ""),
+		RabbitMQURL:         getEnv("RABBITMQ_URL", "amqp://guest:guest@127.0.0.1:5672/"),
+		RabbitMQExchange:    getEnv("RABBITMQ_EXCHANGE", "finance.events"),
+		TransactionQueue:    getEnv("BUDGET_TRANSACTION_EVENTS_QUEUE", "budget.transaction.events"),
 		Database: DatabaseConfig{
 			URL:             getEnv("DATABASE_URL", "postgres://budget_service_user:budget_service_password@127.0.0.1:6433/budget_service_db?sslmode=disable"),
 			MaxOpenConns:    getEnvInt("DATABASE_MAX_OPEN_CONNS", 10),

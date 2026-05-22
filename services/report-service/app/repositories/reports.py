@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 
 from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -58,6 +59,47 @@ class ReportRepository:
             .where(ReportExportJob.id == job_id, ReportExportJob.user_id == user_id)
         )
         return result.scalar_one_or_none()
+
+    async def get_export_job_by_id(self, job_id: uuid.UUID) -> ReportExportJob | None:
+        result = await self.session.execute(
+            select(ReportExportJob)
+            .options(selectinload(ReportExportJob.report_snapshot), selectinload(ReportExportJob.files))
+            .where(ReportExportJob.id == job_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def mark_export_job_processing(self, job: ReportExportJob, started_at: datetime) -> ReportExportJob:
+        job.status = "PROCESSING"
+        job.started_at = started_at
+        job.error_message = None
+        await self.session.flush()
+        return job
+
+    async def mark_export_job_completed(
+        self,
+        job: ReportExportJob,
+        completed_at: datetime,
+        file: ReportFile,
+    ) -> ReportExportJob:
+        job.status = "COMPLETED"
+        job.completed_at = completed_at
+        job.error_message = None
+        self.session.add(file)
+        await self.session.flush()
+        await self.session.refresh(job, attribute_names=["report_snapshot", "files"])
+        return job
+
+    async def mark_export_job_failed(
+        self,
+        job: ReportExportJob,
+        completed_at: datetime,
+        error_message: str,
+    ) -> ReportExportJob:
+        job.status = "FAILED"
+        job.completed_at = completed_at
+        job.error_message = error_message[:1000]
+        await self.session.flush()
+        return job
 
     async def get_file(self, user_id: uuid.UUID, file_id: uuid.UUID) -> ReportFile | None:
         result = await self.session.execute(

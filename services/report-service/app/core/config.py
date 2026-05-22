@@ -25,6 +25,12 @@ class Settings(BaseSettings):
     rate_limit_requests: int = Field(default=120, gt=0)
     rate_limit_window_seconds: int = Field(default=60, gt=0)
     grpc_shared_secret: str | None = None
+    redis_url: str = Field(default="redis://127.0.0.1:6379/0", min_length=1)
+    dashboard_cache_ttl_seconds: int = Field(default=300, gt=0)
+    rabbitmq_url: str = Field(default="amqp://guest:guest@127.0.0.1:5672/", min_length=1)
+    rabbitmq_exchange: str = Field(default="finance.events", min_length=1)
+    report_export_queue: str = Field(default="report.export.requests", min_length=1)
+    report_transaction_events_queue: str = Field(default="report.transaction.events", min_length=1)
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

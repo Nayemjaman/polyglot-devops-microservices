@@ -1,0 +1,16 @@
+services:
+  auth-service:
+    ports:
+      - "8000:8000"
+
+  budget-service:
+    ports:
+      - "8081:8001"
+
+  report-service:
+    ports:
+      - "8003:8003"
+
+  transaction-service:
+    ports:
+      - "8002:8002"

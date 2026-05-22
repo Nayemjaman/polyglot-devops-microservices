@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     storage_bucket_name: str = Field(..., min_length=1)
     storage_public_base_url: str = Field(..., min_length=1)
     storage_path_prefix: str = Field(..., min_length=1)
+    rabbitmq_url: str = Field(default="amqp://guest:guest@127.0.0.1:5672/", min_length=1)
+    rabbitmq_exchange: str = Field(default="finance.events", min_length=1)
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

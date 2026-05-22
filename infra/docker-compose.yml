@@ -38,6 +38,49 @@ x-pgbouncer-common: &pgbouncer-common
     - backend
 
 services:
+  redis:
+    image: redis:7.4-alpine
+    container_name: redis
+    restart: unless-stopped
+    logging: *default-logging
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    expose:
+      - "6379"
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: rabbitmq
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-app}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-app_password}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    expose:
+      - "5672"
+      - "15672"
+    ports:
+      - "15672:15672"
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
   gateway:
     image: caddy:2.8-alpine
     container_name: gateway
@@ -217,6 +260,8 @@ services:
         condition: service_healthy
       budget-migrate:
         condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
     environment:
       APP_ENV: ${BUDGET_APP_ENV:-production}
       HTTP_ADDR: :8001
@@ -230,6 +275,9 @@ services:
       DATABASE_MAX_OPEN_CONNS: ${BUDGET_DATABASE_MAX_OPEN_CONNS:-10}
       DATABASE_MAX_IDLE_CONNS: ${BUDGET_DATABASE_MAX_IDLE_CONNS:-5}
       DATABASE_CONN_MAX_LIFETIME_SECONDS: ${BUDGET_DATABASE_CONN_MAX_LIFETIME_SECONDS:-300}
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-app}:${RABBITMQ_DEFAULT_PASS:-app_password}@rabbitmq:5672/
+      RABBITMQ_EXCHANGE: ${RABBITMQ_EXCHANGE:-finance.events}
+      BUDGET_TRANSACTION_EVENTS_QUEUE: ${BUDGET_TRANSACTION_EVENTS_QUEUE:-budget.transaction.events}
     expose:
       - "8001"
       - "50051"
@@ -311,6 +359,10 @@ services:
         condition: service_completed_successfully
       auth-service:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     environment:
       APP_NAME: ${REPORT_APP_NAME:-report-service}
       APP_ENV: ${REPORT_APP_ENV:-production}
@@ -324,6 +376,12 @@ services:
       DATABASE_ECHO: ${REPORT_DATABASE_ECHO:-False}
       DATABASE_POOL_SIZE: ${REPORT_DATABASE_POOL_SIZE:-5}
       DATABASE_MAX_OVERFLOW: ${REPORT_DATABASE_MAX_OVERFLOW:-10}
+      REDIS_URL: redis://redis:6379/0
+      DASHBOARD_CACHE_TTL_SECONDS: ${REPORT_DASHBOARD_CACHE_TTL_SECONDS:-300}
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-app}:${RABBITMQ_DEFAULT_PASS:-app_password}@rabbitmq:5672/
+      RABBITMQ_EXCHANGE: ${RABBITMQ_EXCHANGE:-finance.events}
+      REPORT_EXPORT_QUEUE: ${REPORT_EXPORT_QUEUE:-report.export.requests}
+      REPORT_TRANSACTION_EVENTS_QUEUE: ${REPORT_TRANSACTION_EVENTS_QUEUE:-report.transaction.events}
     expose:
       - "8003"
     networks:
@@ -334,6 +392,47 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s
+
+  report-worker:
+    <<: *app-runtime
+    build:
+      context: ../services/report-service
+    container_name: report-worker
+    restart: unless-stopped
+    depends_on:
+      report-pgbouncer:
+        condition: service_healthy
+      report-migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      APP_NAME: ${REPORT_APP_NAME:-report-service}
+      APP_ENV: ${REPORT_APP_ENV:-production}
+      HOST: 0.0.0.0
+      PORT: 8003
+      AUTH_SERVICE_URL: http://auth-service:8000
+      HTTP_TIMEOUT_SECONDS: ${REPORT_HTTP_TIMEOUT_SECONDS:-5}
+      DATABASE_URL: postgresql+asyncpg://${REPORT_DB_USER:-report_service_user}:${REPORT_DB_PASSWORD:?REPORT_DB_PASSWORD is required}@report-pgbouncer:6432/${REPORT_DB_NAME:-report_service_db}?prepared_statement_cache_size=0
+      CORS_ALLOWED_ORIGINS: ${REPORT_CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      GRPC_SHARED_SECRET: ${REPORT_GRPC_SHARED_SECRET:?REPORT_GRPC_SHARED_SECRET is required}
+      DATABASE_ECHO: ${REPORT_DATABASE_ECHO:-False}
+      DATABASE_POOL_SIZE: ${REPORT_DATABASE_POOL_SIZE:-5}
+      DATABASE_MAX_OVERFLOW: ${REPORT_DATABASE_MAX_OVERFLOW:-10}
+      REDIS_URL: redis://redis:6379/0
+      DASHBOARD_CACHE_TTL_SECONDS: ${REPORT_DASHBOARD_CACHE_TTL_SECONDS:-300}
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-app}:${RABBITMQ_DEFAULT_PASS:-app_password}@rabbitmq:5672/
+      RABBITMQ_EXCHANGE: ${RABBITMQ_EXCHANGE:-finance.events}
+      REPORT_EXPORT_QUEUE: ${REPORT_EXPORT_QUEUE:-report.export.requests}
+      REPORT_TRANSACTION_EVENTS_QUEUE: ${REPORT_TRANSACTION_EVENTS_QUEUE:-report.transaction.events}
+    command:
+      - python
+      - -m
+      - app.workers.export_worker
+    networks:
+      - backend
 
   report-migrate:
     <<: *app-runtime
@@ -458,6 +557,8 @@ services:
         condition: service_healthy
       transaction-minio-init:
         condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
     environment:
       APP_NAME: ${TRANSACTION_APP_NAME:-transaction-service}
       APP_ENV: ${TRANSACTION_APP_ENV:-production}
@@ -478,6 +579,8 @@ services:
       STORAGE_BUCKET_NAME: ${TRANSACTION_STORAGE_BUCKET_NAME:-transaction-attachments}
       STORAGE_PUBLIC_BASE_URL: ${TRANSACTION_STORAGE_PUBLIC_BASE_URL:-http://127.0.0.1:9000}
       STORAGE_PATH_PREFIX: ${TRANSACTION_STORAGE_PATH_PREFIX:-attachments}
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-app}:${RABBITMQ_DEFAULT_PASS:-app_password}@rabbitmq:5672/
+      RABBITMQ_EXCHANGE: ${RABBITMQ_EXCHANGE:-finance.events}
     expose:
       - "8002"
     networks:
@@ -535,5 +638,7 @@ volumes:
   report-postgres-data:
   transaction-postgres-data:
   transaction-minio-data:
+  redis-data:
+  rabbitmq-data:
   caddy-data:
   caddy-config:

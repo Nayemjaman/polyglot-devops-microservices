@@ -7,6 +7,7 @@ import (
 
 	"github.com/nayem/polyglot-devops-microservices/services/budget-service/internal/config"
 	"github.com/nayem/polyglot-devops-microservices/services/budget-service/internal/database"
+	"github.com/nayem/polyglot-devops-microservices/services/budget-service/internal/messaging"
 	"github.com/nayem/polyglot-devops-microservices/services/budget-service/internal/transport/http"
 )
 
@@ -34,6 +35,7 @@ func main() {
 	}
 
 	router := http.NewRouter(cfg, logger, db)
+	messaging.NewConsumer(cfg.RabbitMQURL, cfg.RabbitMQExchange, cfg.TransactionQueue, logger).Start(context.Background())
 
 	logger.Info("starting budget service", "address", cfg.HTTPAddr)
 	if err := router.Run(cfg.HTTPAddr); err != nil {

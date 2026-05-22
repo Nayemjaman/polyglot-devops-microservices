@@ -4,7 +4,7 @@ from datetime import date
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.dependencies import get_current_user_id, get_db_session
+from app.api.dependencies import get_current_user_id, get_db_session, get_event_publisher
 from app.api.errors import raise_service_error
 from app.api.presenters import transaction_to_out
 from app.schemas.pagination import PaginationParams
@@ -22,6 +22,7 @@ async def create_transaction(
     payload: TransactionCreate,
     user_id: uuid.UUID = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_db_session),
+    event_publisher=Depends(get_event_publisher),
 ) -> ApiResponse:
     try:
         transaction = await transaction_service.create_transaction(session, user_id, payload)
@@ -31,6 +32,18 @@ async def create_transaction(
         "Transfer transaction created successfully"
         if payload.type == "TRANSFER"
         else "Transaction created successfully"
+    )
+    await event_publisher.publish(
+        "transaction.created",
+        {
+            "event_type": "transaction.created",
+            "user_id": str(user_id),
+            "transaction_id": str(transaction.id),
+            "type": transaction.type,
+            "amount": transaction.amount,
+            "currency_code": transaction.currency_code,
+            "transaction_date": transaction.transaction_date,
+        },
     )
     return ApiResponse(message=message, data=transaction_to_out(transaction))
 
@@ -136,11 +149,24 @@ async def update_transaction(
     payload: TransactionUpdate,
     user_id: uuid.UUID = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_db_session),
+    event_publisher=Depends(get_event_publisher),
 ) -> ApiResponse:
     try:
         transaction = await transaction_service.update_transaction(session, user_id, transaction_id, payload)
     except ServiceError as exc:
         raise_service_error(exc)
+    await event_publisher.publish(
+        "transaction.updated",
+        {
+            "event_type": "transaction.updated",
+            "user_id": str(user_id),
+            "transaction_id": str(transaction.id),
+            "type": transaction.type,
+            "amount": transaction.amount,
+            "currency_code": transaction.currency_code,
+            "transaction_date": transaction.transaction_date,
+        },
+    )
     return ApiResponse(message="Transaction updated successfully", data=transaction_to_out(transaction))
 
 
@@ -149,9 +175,18 @@ async def delete_transaction(
     transaction_id: uuid.UUID,
     user_id: uuid.UUID = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_db_session),
+    event_publisher=Depends(get_event_publisher),
 ) -> ApiResponse:
     try:
         await transaction_service.delete_transaction(session, user_id, transaction_id)
     except ServiceError as exc:
         raise_service_error(exc)
+    await event_publisher.publish(
+        "transaction.deleted",
+        {
+            "event_type": "transaction.deleted",
+            "user_id": str(user_id),
+            "transaction_id": str(transaction_id),
+        },
+    )
     return ApiResponse(message="Transaction deleted successfully", data=None)

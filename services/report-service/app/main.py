@@ -1,14 +1,17 @@
 from contextlib import asynccontextmanager
 
 import httpx
+from redis.asyncio import Redis
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from app.api.router import api_router
+from app.cache import DashboardCache, NullDashboardCache
 from app.core.config import get_settings
 from app.core.middleware import add_security_middleware
 from app.db.session import create_engine, create_sessionmaker
+from app.messaging import NullPublisher, RabbitMQPublisher
 from app.schemas.responses import ErrorResponse
 
 
@@ -20,9 +23,23 @@ async def lifespan(app: FastAPI):
     app.state.auth_cache = {}
     app.state.db_engine = create_engine(settings)
     app.state.db_sessionmaker = create_sessionmaker(app.state.db_engine)
+    app.state.redis = Redis.from_url(settings.redis_url, decode_responses=True)
+    try:
+        await app.state.redis.ping()
+        app.state.dashboard_cache = DashboardCache(app.state.redis, settings)
+    except Exception:
+        app.state.dashboard_cache = NullDashboardCache()
+    app.state.event_publisher = RabbitMQPublisher(settings)
+    try:
+        await app.state.event_publisher.connect()
+    except Exception:
+        app.state.event_publisher = NullPublisher()
     try:
         yield
     finally:
+        if hasattr(app.state.event_publisher, "close"):
+            await app.state.event_publisher.close()
+        await app.state.redis.aclose()
         await app.state.http_client.aclose()
         await app.state.db_engine.dispose()
 

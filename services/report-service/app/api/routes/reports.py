@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -106,13 +106,18 @@ async def savings_report(
 
 @router.get("/dashboard", response_model=ApiResponse)
 async def dashboard(
+    request: Request,
     year: int = Query(..., ge=1900, le=9999),
     month: int = Query(..., ge=1, le=12),
     user_id: uuid.UUID = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> ApiResponse:
+    cached = await request.app.state.dashboard_cache.get(user_id, year, month)
+    if cached is not None:
+        return ApiResponse(message="Dashboard data fetched successfully", data=cached)
     data = await get_report_service(session).dashboard(user_id, year, month)
     await session.commit()
+    await request.app.state.dashboard_cache.set(user_id, year, month, data)
     return ApiResponse(message="Dashboard data fetched successfully", data=data)
 
 
@@ -129,6 +134,7 @@ async def dashboard_monthly_summary(
 
 @router.post("/export", response_model=ApiResponse, status_code=status.HTTP_201_CREATED)
 async def create_export_job(
+    request: Request,
     payload: ExportRequest,
     user_id: uuid.UUID = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_db_session),
@@ -139,6 +145,16 @@ async def create_export_job(
         await session.rollback()
         raise_service_error(exc)
     await session.commit()
+    await request.app.state.event_publisher.publish(
+        "report.export.requested",
+        {
+            "export_job_id": str(data.export_job_id),
+            "report_snapshot_id": str(data.report_snapshot_id),
+            "user_id": str(user_id),
+            "report_type": data.report_type,
+            "export_type": data.export_type,
+        },
+    )
     return ApiResponse(message="Report export job created successfully", data=data)
 
 
