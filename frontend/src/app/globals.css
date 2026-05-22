@@ -1,0 +1,78 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 170 30% 98%;
+  --foreground: 220 24% 12%;
+  --card: 0 0% 100%;
+  --card-foreground: 220 24% 12%;
+  --primary: 165 100% 31%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 34 100% 62%;
+  --secondary-foreground: 220 24% 12%;
+  --muted: 168 18% 92%;
+  --muted-foreground: 220 10% 42%;
+  --accent: 210 92% 55%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 76% 55%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 174 18% 84%;
+  --input: 174 18% 84%;
+  --ring: 165 100% 31%;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100vh;
+  background:
+    linear-gradient(135deg, rgba(236, 253, 245, 0.95), rgba(255, 251, 235, 0.7) 44%, rgba(239, 246, 255, 0.95)),
+    hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.mesh-grid {
+  background-image:
+    linear-gradient(rgba(15, 118, 110, 0.11) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 118, 110, 0.11) 1px, transparent 1px);
+  background-size: 38px 38px;
+  mask-image: linear-gradient(to bottom, black, transparent 85%);
+}
+
+.glass-panel {
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(18px);
+}
+
+.text-balance {
+  text-wrap: balance;
+}
+
+.aurora-surface {
+  background:
+    radial-gradient(circle at 18% 20%, rgba(45, 212, 191, 0.18), transparent 28%),
+    radial-gradient(circle at 82% 12%, rgba(251, 191, 36, 0.16), transparent 26%),
+    radial-gradient(circle at 70% 85%, rgba(56, 189, 248, 0.16), transparent 28%),
+    linear-gradient(135deg, rgba(248, 250, 252, 0.98), rgba(240, 253, 250, 0.92), rgba(255, 251, 235, 0.78));
+}
+
+.soft-noise {
+  background-image:
+    linear-gradient(rgba(15, 23, 42, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.035) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
