@@ -1,6 +1,6 @@
 # Local service stack
 
-This compose stack runs the backend services behind a local Caddy gateway, plus one isolated PostgreSQL database and one PgBouncer pooler for each service.
+This compose stack runs the frontend and backend services behind a local Caddy gateway, plus one isolated PostgreSQL database and one PgBouncer pooler for each backend service.
 
 ## Start
 
@@ -18,6 +18,8 @@ Use the gateway instead of calling services directly:
 | --- | --- |
 | HTTP | `http://127.0.0.1:8080` |
 | HTTPS with Caddy internal CA | `https://127.0.0.1:8443` |
+
+The frontend is served from the gateway root. API routes stay on the same origin and are forwarded by Caddy to the backend services.
 
 For local HTTPS testing with curl, use `-k` unless you install Caddy's local CA certificate.
 
@@ -40,6 +42,7 @@ python3 api_smoke_test.py --email smoke@example.com --password 'StrongPass123!'
 | `/api/budgets*` | `budget-service:8001` |
 | `/api/reports*` | `report-service:8003` |
 | `/api/*` | `transaction-service:8002` |
+| `/*` | `frontend:3000` |
 
 ## Service connection targets
 

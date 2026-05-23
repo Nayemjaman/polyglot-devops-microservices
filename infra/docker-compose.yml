@@ -95,6 +95,8 @@ services:
         condition: service_healthy
       transaction-service:
         condition: service_healthy
+      frontend:
+        condition: service_healthy
     ports:
       - "8080:8080"
       - "8443:8443"
@@ -104,6 +106,32 @@ services:
       - caddy-config:/config
     networks:
       - backend
+
+  frontend:
+    <<: *app-runtime
+    build:
+      context: ../frontend
+    container_name: frontend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      NEXT_PUBLIC_API_BASE_URL: ${FRONTEND_PUBLIC_API_BASE_URL:-}
+      API_PROXY_TARGET: ${FRONTEND_API_PROXY_TARGET:-http://gateway:8080}
+      TRANSACTION_API_TARGET: ${FRONTEND_TRANSACTION_API_TARGET:-http://transaction-service:8002}
+      REPORT_API_TARGET: ${FRONTEND_REPORT_API_TARGET:-http://report-service:8003}
+      BUDGET_API_TARGET: ${FRONTEND_BUDGET_API_TARGET:-http://budget-service:8001}
+    expose:
+      - "3000"
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   auth-postgres:
     <<: *postgres-common
