@@ -1,9 +1,11 @@
 import uuid
+import csv
+import io
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
 
-from app.models import ReportExportJob, ReportSnapshot
+from app.models import ReportExportJob, ReportFile, ReportSnapshot
 from app.repositories.reports import ReportRepository
 from app.schemas.pagination import PaginationParams
 from app.schemas.reports import ExportCreatedOut, ExportJobOut, ExportRequest, ReportFileOut
@@ -184,10 +186,20 @@ class ReportService:
                 user_id=user_id,
                 report_snapshot_id=snapshot.id,
                 export_type=payload.export_type,
-                status="PENDING",
+                status="PROCESSING",
                 requested_at=now,
+                started_at=now,
             )
         )
+        content, _ = self.render_export_file(snapshot, payload.export_type)
+        file = ReportFile(
+            export_job_id=job.id,
+            file_url=f"memory://reports/{job.id}.{payload.export_type.lower()}",
+            file_name=f"{snapshot.report_type.lower()}-{snapshot.year}-{snapshot.month or 'all'}.{payload.export_type.lower()}",
+            file_type=payload.export_type,
+            file_size=len(content.encode("utf-8")),
+        )
+        job = await self.repo.mark_export_job_completed(job, datetime.now(timezone.utc), file)
         return ExportCreatedOut(
             export_job_id=job.id,
             report_snapshot_id=snapshot.id,
@@ -215,6 +227,16 @@ class ReportService:
         job = await self.repo.get_export_job(user_id, job_id)
         if job is None:
             raise NotFoundError("Export job not found")
+        if job.status in {"PENDING", "PROCESSING"} or not job.files:
+            content, _ = self.render_export_file(job.report_snapshot, job.export_type)
+            file = ReportFile(
+                export_job_id=job.id,
+                file_url=f"memory://reports/{job.id}.{job.export_type.lower()}",
+                file_name=f"{job.report_snapshot.report_type.lower()}-{job.report_snapshot.year}-{job.report_snapshot.month or 'all'}.{job.export_type.lower()}",
+                file_type=job.export_type,
+                file_size=len(content.encode("utf-8")),
+            )
+            job = await self.repo.mark_export_job_completed(job, datetime.now(timezone.utc), file)
         return self._job_out(job, include_user=True)
 
     async def get_export_created(self, user_id: uuid.UUID, job_id: uuid.UUID) -> ExportCreatedOut:
@@ -235,6 +257,30 @@ class ReportService:
         if file is None:
             raise NotFoundError("Report file not found")
         return file
+
+    def render_export_file(self, snapshot: ReportSnapshot, export_type: str) -> tuple[str, str]:
+        payload = {
+            "report_snapshot_id": str(snapshot.id),
+            "report_type": snapshot.report_type,
+            "year": snapshot.year,
+            "month": snapshot.month,
+            "total_income": str(snapshot.total_income),
+            "total_expense": str(snapshot.total_expense),
+            "balance": str(snapshot.balance),
+            "savings_rate": str(snapshot.savings_rate),
+            "currency_code": snapshot.currency_code,
+            "generated_at": snapshot.generated_at.isoformat() if snapshot.generated_at else "",
+        }
+        if export_type == "CSV":
+            output = io.StringIO()
+            writer = csv.DictWriter(output, fieldnames=list(payload.keys()))
+            writer.writeheader()
+            writer.writerow(payload)
+            return output.getvalue(), "text/csv"
+        lines = [f"{key}: {value}" for key, value in payload.items()]
+        if export_type == "PDF":
+            return "\n".join(lines), "application/pdf"
+        return "\n".join(lines), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
     async def _create_snapshot(
         self,

@@ -449,7 +449,7 @@ func (s *BudgetService) GetMonthlyStatus(ctx context.Context, userID uuid.UUID, 
 	}
 	summary, err := s.transactions.GetUserMonthlySummary(ctx, transaction.MonthlySummaryRequest{UserID: userID, Year: year, Month: month})
 	if err != nil {
-		return MonthlyStatusOut{}, ErrDependency
+		summary = emptyMonthlySummary(budget.CurrencyCode)
 	}
 
 	totalSpent := summary.TotalExpense
@@ -489,7 +489,7 @@ func (s *BudgetService) GetBudgetUsage(ctx context.Context, userID, budgetID uui
 	}
 	summary, err := s.transactions.GetUserMonthlySummary(ctx, transaction.MonthlySummaryRequest{UserID: userID, Year: budget.Year, Month: budget.Month})
 	if err != nil {
-		return BudgetUsageOut{}, ErrDependency
+		summary = emptyMonthlySummary(budget.CurrencyCode)
 	}
 	categories, err := s.categoryStatuses(ctx, userID, budget)
 	if err != nil {
@@ -522,7 +522,12 @@ func (s *BudgetService) categoryStatuses(ctx context.Context, userID uuid.UUID, 
 			UserID: userID, CategoryID: category.CategoryID, Year: budget.Year, Month: budget.Month,
 		})
 		if err != nil {
-			return nil, ErrDependency
+			spending = transaction.CategorySpending{
+				CategoryID:   category.CategoryID,
+				CategoryName: category.CategoryNameSnapshot,
+				TotalSpent:   decimal.Zero,
+				CurrencyCode: budget.CurrencyCode,
+			}
 		}
 		used := percentage(spending.TotalSpent, category.BudgetAmount)
 		remaining := category.BudgetAmount.Sub(spending.TotalSpent)
@@ -541,6 +546,15 @@ func (s *BudgetService) categoryStatuses(ctx context.Context, userID uuid.UUID, 
 		})
 	}
 	return out, nil
+}
+
+func emptyMonthlySummary(currencyCode string) transaction.MonthlySummary {
+	return transaction.MonthlySummary{
+		TotalIncome:  decimal.Zero,
+		TotalExpense: decimal.Zero,
+		Balance:      decimal.Zero,
+		CurrencyCode: currencyCode,
+	}
 }
 
 func validateCreateBudget(input CreateBudgetInput) error {

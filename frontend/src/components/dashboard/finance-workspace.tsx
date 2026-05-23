@@ -5,7 +5,6 @@ import {
   BarChart3,
   Bell,
   CreditCard,
-  Download,
   FileText,
   Landmark,
   Link as LinkIcon,
@@ -25,6 +24,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
   financeApi,
+  downloadReportFile,
   paginationPage,
   paginationTotalPages,
   type PaginatedResponse,
@@ -42,7 +42,7 @@ import {
 import { persistUser, type AuthUser } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
-type SectionId = "overview" | "setup" | "transactions" | "budgets" | "reports" | "system";
+type SectionId = "overview" | "setup" | "transactions" | "budgets" | "reports";
 
 type WorkspaceData = {
   wallets: Wallet[];
@@ -74,8 +74,7 @@ const navItems: Array<{ id: SectionId; label: string; icon: typeof BarChart3 }> 
   { id: "setup", label: "Setup", icon: WalletCards },
   { id: "transactions", label: "Activity", icon: CreditCard },
   { id: "budgets", label: "Budgets", icon: Bell },
-  { id: "reports", label: "Reports", icon: FileText },
-  { id: "system", label: "Status", icon: RefreshCw }
+  { id: "reports", label: "Reports", icon: FileText }
 ];
 
 const emptyData: WorkspaceData = {
@@ -93,8 +92,36 @@ function listState<T>(items: T[] = [], page = 1, totalPages = 1): ListState<T> {
   return { items, meta: { page, totalPages } };
 }
 
+function sectionFromHash(): SectionId {
+  if (typeof window === "undefined") {
+    return "overview";
+  }
+  const section = window.location.hash.replace("#", "");
+  return navItems.some((item) => item.id === section) ? (section as SectionId) : "overview";
+}
+
+async function completeVisibleExportJobs(jobs: ExportJob[]) {
+  return Promise.all(
+    jobs.map(async (job) => {
+      const id = job.id || job.export_job_id;
+      if (!id || (job.status === "COMPLETED" && job.file?.id)) {
+        return job;
+      }
+      if (job.status === "PENDING" || job.status === "PROCESSING" || !job.file?.id) {
+        try {
+          const response = await financeApi.reports.exportJob(id);
+          return response.data;
+        } catch {
+          return job;
+        }
+      }
+      return job;
+    })
+  );
+}
+
 export function FinanceWorkspace({ user }: { user: AuthUser }) {
-  const [activeSection, setActiveSection] = useState<SectionId>("overview");
+  const [activeSection, setActiveSection] = useState<SectionId>(sectionFromHash);
   const [data, setData] = useState<WorkspaceData>(emptyData);
   const [year, setYear] = useState(initialYear);
   const [month, setMonth] = useState(initialMonth);
@@ -139,6 +166,7 @@ export function FinanceWorkspace({ user }: { user: AuthUser }) {
         financeApi.budgets.list({ page_size: 50 }),
         financeApi.reports.exportJobs({ page_size: 10 })
       ]);
+      const completedExportJobs = await completeVisibleExportJobs(exportJobs.data);
       setData({
         wallets: wallets.data,
         categories: categories.data,
@@ -147,7 +175,7 @@ export function FinanceWorkspace({ user }: { user: AuthUser }) {
         transactions: transactions.data,
         recurring: recurring.data,
         budgets: budgets.data,
-        exportJobs: exportJobs.data
+        exportJobs: completedExportJobs
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load workspace data");
@@ -159,6 +187,11 @@ export function FinanceWorkspace({ user }: { user: AuthUser }) {
   useEffect(() => {
     loadCoreData();
   }, []);
+
+  function chooseSection(section: SectionId) {
+    setActiveSection(section);
+    window.history.replaceState(null, "", `#${section}`);
+  }
 
   const totals = useMemo(() => {
     const balance = data.wallets.reduce((sum, wallet) => sum + Number(wallet.current_balance || 0), 0);
@@ -187,7 +220,7 @@ export function FinanceWorkspace({ user }: { user: AuthUser }) {
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => setActiveSection(item.id)}
+                  onClick={() => chooseSection(item.id)}
                   className={cn(
                     "flex h-11 min-w-max items-center gap-3 rounded-md px-3 text-left text-sm font-semibold transition lg:min-w-0",
                     activeSection === item.id ? "bg-white text-slate-950 shadow-sm" : "text-white/70 hover:bg-white/10 hover:text-white"
@@ -283,8 +316,6 @@ export function FinanceWorkspace({ user }: { user: AuthUser }) {
               busyAction={busyAction}
             />
           ) : null}
-
-          {activeSection === "system" ? <SystemSection runAction={runAction} /> : null}
         </section>
       </div>
     </main>
@@ -667,7 +698,7 @@ function TransactionsSection({ data, runAction, busyAction }: { data: WorkspaceD
                           setTransactionDetails(response.data);
                           return response.message;
                         },
-                        false
+                        true
                       )
                     }
                   >
@@ -695,7 +726,7 @@ function TransactionsSection({ data, runAction, busyAction }: { data: WorkspaceD
         {selectedTransaction ? (
           <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_.9fr]">
             <TransactionEditForm transaction={selectedTransaction} data={data} runAction={runAction} busyAction={busyAction} />
-            <JsonBox title="Transaction details" value={transactionDetails || selectedTransaction} />
+            <DetailSummary title="Transaction details" value={transactionDetails || selectedTransaction} />
           </div>
         ) : null}
       </Panel>
@@ -1052,7 +1083,8 @@ function ReportsSection({
       status: text(form, "status"),
       export_type: text(form, "export_type")
     });
-    setExportJobs(fromPaginated(response));
+    const completedJobs = await completeVisibleExportJobs(response.data);
+    setExportJobs({ items: completedJobs, meta: { page: paginationPage(response), totalPages: paginationTotalPages(response) } });
   }
 
   const reportButtons = [
@@ -1120,75 +1152,35 @@ function ReportsSection({
                       runAction(
                         "export-job",
                         async () => {
+                          if (job.file?.id) {
+                            await downloadReportFile(job.file);
+                            return "Download started";
+                          }
                           const response = await financeApi.reports.exportJob(id);
                           setOutput(response.data);
+                          setExportJobs((current) => ({
+                            ...current,
+                            items: current.items.map((item) => ((item.id || item.export_job_id) === id ? response.data : item))
+                          }));
+                          if (response.data.file?.id) {
+                            await downloadReportFile(response.data.file);
+                          }
                           return response.message;
                         },
                         false
                       )
                     }
                   >
-                    View
+                    {job.file?.id ? "Download" : "Prepare"}
                   </Button>
-                  {job.file?.id ? (
-                    <a href={financeApi.reports.downloadUrl(job.file.id)} target="_blank" rel="noreferrer">
-                      <Button type="button" variant="secondary">
-                        <Download size={16} />
-                        Download
-                      </Button>
-                    </a>
-                  ) : null}
                 </div>
               </div>
             );
           })}
-          {!data.exportJobs.length ? <EmptyState text="No export jobs yet." /> : null}
+          {!exportJobs.items.length ? <EmptyState text="No export jobs yet." /> : null}
         </div>
       </Panel>
     </div>
-  );
-}
-
-function SystemSection({ runAction }: { runAction: RunAction }) {
-  const [output, setOutput] = useState<unknown>(null);
-  const checks = [
-    ["Gateway", financeApi.system.gatewayHealth],
-    ["Transactions", financeApi.system.transactionHealth],
-    ["Transaction DB", financeApi.system.transactionDbHealth],
-    ["Storage", financeApi.system.transactionStorageHealth],
-    ["Reports", financeApi.system.reportHealth],
-    ["Report DB", financeApi.system.reportDbHealth],
-    ["Budgets", financeApi.system.budgetHealth]
-  ] as const;
-
-  return (
-    <Panel title="Service status" description="Run health checks for the gateway and backend services. Direct service checks need the matching local service ports or env targets.">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {checks.map(([label, request]) => (
-          <Button
-            key={label}
-            type="button"
-            variant="secondary"
-            onClick={() =>
-              runAction(
-                `health-${label}`,
-                async () => {
-                  const response = await request();
-                  setOutput(response);
-                  return `${label} check completed`;
-                },
-                false
-              )
-            }
-          >
-            {label}
-          </Button>
-        ))}
-      </div>
-      <div className="mt-5">
-        <StatusCards value={output} />
-      </div>
-    </Panel>
   );
 }
 
@@ -1265,7 +1257,7 @@ function WalletEditForm({ wallet, runAction, busyAction }: { wallet: Wallet; run
         <label className="flex items-center gap-2 text-sm font-medium"><input name="is_default" type="checkbox" defaultChecked={wallet.is_default} /> Default</label>
         <label className="flex items-center gap-2 text-sm font-medium"><input name="is_active" type="checkbox" defaultChecked={wallet.is_active} /> Active</label>
       </SimpleForm>
-      {details ? <JsonBox title="Wallet details" value={details} /> : null}
+      {details ? <DetailSummary title="Wallet details" value={details} /> : null}
     </EditShell>
   );
 }
@@ -1399,7 +1391,7 @@ function CategoryEditForm({
         <Field label="Parent"><OptionSelect name="parent_category_id" items={categories.filter((item) => item.id !== category.id)} placeholder="No parent" defaultValue={category.parent_category_id || ""} /></Field>
         <label className="flex items-center gap-2 text-sm font-medium"><input name="is_active" type="checkbox" defaultChecked={category.is_active} /> Active</label>
       </SimpleForm>
-      {details ? <JsonBox title="Category details" value={details} /> : null}
+      {details ? <DetailSummary title="Category details" value={details} /> : null}
     </EditShell>
   );
 }
@@ -1470,7 +1462,7 @@ function PaymentMethodEditForm({ method, runAction, busyAction }: { method: Paym
         <Field label="Type"><EnumSelect name="type" values={["CASH", "CARD", "BANK_TRANSFER", "MOBILE_BANKING", "OTHER"]} defaultValue={method.type} /></Field>
         <label className="flex items-center gap-2 text-sm font-medium"><input name="is_active" type="checkbox" defaultChecked={method.is_active} /> Active</label>
       </SimpleForm>
-      {details ? <JsonBox title="Payment method details" value={details} /> : null}
+      {details ? <DetailSummary title="Payment method details" value={details} /> : null}
     </EditShell>
   );
 }
@@ -2270,22 +2262,6 @@ function IconDelete({ onClick }: { onClick: () => void }) {
   );
 }
 
-function JsonBox({ title, value }: { title: string; value: unknown }) {
-  return (
-    <div className="overflow-hidden rounded-md border bg-white shadow-sm">
-      <div className="flex items-center justify-between border-b bg-slate-50 px-3 py-2">
-        <span className="text-sm font-bold">{title}</span>
-        <span className="rounded-full bg-teal-50 px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-teal-700">
-          Live
-        </span>
-      </div>
-      <pre className="max-h-80 overflow-auto bg-slate-950 p-3 text-xs leading-5 text-teal-100">
-        {value ? JSON.stringify(value, null, 2) : "Run a request to view results here."}
-      </pre>
-    </div>
-  );
-}
-
 function ReportVisual({ title, value }: { title: string; value: unknown }) {
   const rows = flattenNumbers(value).slice(0, 8);
   const max = Math.max(...rows.map((row) => Math.abs(row.value)), 1);
@@ -2314,31 +2290,27 @@ function ReportVisual({ title, value }: { title: string; value: unknown }) {
       ) : (
         <div className="p-4 text-sm text-muted-foreground">Run a request to show chart-ready values.</div>
       )}
-      <details className="border-t">
-        <summary className="cursor-pointer px-3 py-2 text-xs font-bold text-muted-foreground">Raw response</summary>
-        <pre className="max-h-60 overflow-auto bg-slate-950 p-3 text-xs leading-5 text-teal-100">{value ? JSON.stringify(value, null, 2) : "{}"}</pre>
-      </details>
     </div>
   );
 }
 
-function StatusCards({ value }: { value: unknown }) {
-  const status = statusLabel(value);
+function DetailSummary({ title, value }: { title: string; value: unknown }) {
+  const fields = summaryFields(value);
   return (
-    <div className="rounded-md border bg-white p-4">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-sm font-black">Last check</p>
-          <p className="mt-1 text-sm text-muted-foreground">{status.detail}</p>
+    <div className="overflow-hidden rounded-md border bg-white shadow-sm">
+      <div className="border-b bg-slate-50 px-3 py-2 text-sm font-bold">{title}</div>
+      {fields.length ? (
+        <div className="grid gap-2 p-3 sm:grid-cols-2">
+          {fields.map(([key, item]) => (
+            <div key={key} className="rounded-md border bg-white p-3">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">{human(key)}</p>
+              <p className="mt-1 break-words text-sm font-semibold">{String(item)}</p>
+            </div>
+          ))}
         </div>
-        <span className={cn("rounded-full px-3 py-1 text-xs font-black", status.ok ? "bg-teal-50 text-teal-700" : "bg-amber-50 text-amber-700")}>
-          {status.ok ? "Healthy" : "Check"}
-        </span>
-      </div>
-      <details className="mt-4">
-        <summary className="cursor-pointer text-xs font-bold text-muted-foreground">Response details</summary>
-        <pre className="mt-2 max-h-60 overflow-auto rounded-md bg-slate-950 p-3 text-xs leading-5 text-teal-100">{value ? JSON.stringify(value, null, 2) : "{}"}</pre>
-      </details>
+      ) : (
+        <div className="p-4 text-sm text-muted-foreground">No details to show.</div>
+      )}
     </div>
   );
 }
@@ -2416,16 +2388,13 @@ function flattenNumbers(value: unknown, prefix = ""): Array<{ label: string; val
   });
 }
 
-function statusLabel(value: unknown) {
-  if (typeof value === "string") {
-    return { ok: value.toLowerCase().includes("ok"), detail: value };
+function summaryFields(value: unknown): Array<[string, string | number | boolean]> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return [];
   }
-  if (value && typeof value === "object") {
-    const record = value as Record<string, unknown>;
-    const status = String(record.status || record.message || "Response received");
-    return { ok: status.toLowerCase().includes("ok") || status.toLowerCase().includes("healthy"), detail: status };
-  }
-  return { ok: false, detail: "No check run yet" };
+  return Object.entries(value as Record<string, unknown>)
+    .filter(([, item]) => ["string", "number", "boolean"].includes(typeof item))
+    .slice(0, 10) as Array<[string, string | number | boolean]>;
 }
 
 function human(value: string) {

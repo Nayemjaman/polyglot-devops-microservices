@@ -104,6 +104,7 @@ class ReportRepository:
     async def get_file(self, user_id: uuid.UUID, file_id: uuid.UUID) -> ReportFile | None:
         result = await self.session.execute(
             select(ReportFile)
+            .options(selectinload(ReportFile.export_job).selectinload(ReportExportJob.report_snapshot))
             .join(ReportExportJob)
             .where(ReportFile.id == file_id, ReportExportJob.user_id == user_id)
         )

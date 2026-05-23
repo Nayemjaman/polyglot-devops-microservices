@@ -1,7 +1,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, Header, Query, Request, status
-from fastapi.responses import RedirectResponse
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import get_current_user_id, get_db_session
@@ -216,6 +216,7 @@ async def get_export_job(
         data = await get_report_service(session).get_export_job(user_id, id)
     except ServiceError as exc:
         raise_service_error(exc)
+    await session.commit()
     return ApiResponse(message="Export job fetched successfully", data=data)
 
 
@@ -229,4 +230,12 @@ async def download_report_file(
         file = await get_report_service(session).get_file(user_id, id)
     except ServiceError as exc:
         raise_service_error(exc)
-    return RedirectResponse(url=file.file_url)
+    content, media_type = get_report_service(session).render_export_file(
+        file.export_job.report_snapshot,
+        file.file_type,
+    )
+    return StreamingResponse(
+        iter([content.encode("utf-8")]),
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{file.file_name}"'},
+    )
