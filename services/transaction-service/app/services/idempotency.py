@@ -64,6 +64,10 @@ async def save_record(
         )
     )
     try:
-        await session.commit()
+        await session.flush()
     except IntegrityError:
         await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"message": "Idempotency-Key is already being processed"},
+        ) from None

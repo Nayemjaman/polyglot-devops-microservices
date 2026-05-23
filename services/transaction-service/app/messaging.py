@@ -40,7 +40,7 @@ class RabbitMQPublisher:
         if self.connection:
             await self.connection.close()
 
-    async def publish(self, routing_key: str, payload: dict[str, Any]) -> None:
+    async def publish(self, routing_key: str, payload: dict[str, Any], message_id: str | None = None) -> None:
         if self.exchange is None:
             return
         await self.exchange.publish(
@@ -48,11 +48,12 @@ class RabbitMQPublisher:
                 body=json.dumps(payload, default=json_default).encode("utf-8"),
                 content_type="application/json",
                 delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
+                message_id=message_id,
             ),
             routing_key=routing_key,
         )
 
 
 class NullPublisher:
-    async def publish(self, routing_key: str, payload: dict[str, Any]) -> None:
+    async def publish(self, routing_key: str, payload: dict[str, Any], message_id: str | None = None) -> None:
         logger.warning("RabbitMQ unavailable; skipped publish", extra={"routing_key": routing_key})

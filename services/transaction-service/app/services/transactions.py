@@ -110,7 +110,7 @@ async def create_transaction(
     await session.flush()
     await set_transaction_tags(session, user_id, transaction, payload.tags)
     apply_balance(wallet, transaction.type, transaction.amount)
-    await session.commit()
+    await session.flush()
     return await get_transaction(session, user_id, transaction.id)
 
 
@@ -196,7 +196,7 @@ async def update_transaction(
     if tags is not None:
         await set_transaction_tags(session, user_id, transaction, tags)
     apply_balance(wallet, transaction.type, transaction.amount)
-    await session.commit()
+    await session.flush()
     return await get_transaction(session, user_id, transaction.id)
 
 
@@ -204,4 +204,4 @@ async def delete_transaction(session: AsyncSession, user_id: uuid.UUID, transact
     transaction = await get_transaction(session, user_id, transaction_id)
     apply_balance(transaction.wallet, transaction.type, transaction.amount, reverse=True)
     transaction.is_deleted = True
-    await session.commit()
+    await session.flush()

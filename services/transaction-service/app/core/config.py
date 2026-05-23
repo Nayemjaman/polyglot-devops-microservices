@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     storage_path_prefix: str = Field(..., min_length=1)
     rabbitmq_url: str = Field(default="amqp://guest:guest@127.0.0.1:5672/", min_length=1)
     rabbitmq_exchange: str = Field(default="finance.events", min_length=1)
+    outbox_batch_size: int = Field(default=50, gt=0)
+    outbox_poll_interval_seconds: float = Field(default=2.0, gt=0)
+    outbox_max_attempts: int = Field(default=10, gt=0)
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

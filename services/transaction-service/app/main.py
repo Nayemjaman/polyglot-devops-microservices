@@ -9,7 +9,6 @@ from app.api.router import api_router
 from app.core.config import Settings, get_settings
 from app.core.middleware import add_security_middleware
 from app.db.session import create_engine, create_sessionmaker
-from app.messaging import NullPublisher, RabbitMQPublisher
 from app.schemas.responses import ErrorResponse
 from app.storage.client import AttachmentStorage
 
@@ -22,16 +21,9 @@ async def lifespan(app: FastAPI):
     app.state.db_engine = create_engine(settings)
     app.state.db_sessionmaker = create_sessionmaker(app.state.db_engine)
     app.state.attachment_storage = AttachmentStorage(settings)
-    app.state.event_publisher = RabbitMQPublisher(settings)
-    try:
-        await app.state.event_publisher.connect()
-    except Exception:
-        app.state.event_publisher = NullPublisher()
     try:
         yield
     finally:
-        if hasattr(app.state.event_publisher, "close"):
-            await app.state.event_publisher.close()
         await app.state.http_client.aclose()
         await app.state.db_engine.dispose()
 

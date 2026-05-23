@@ -4,7 +4,7 @@ from datetime import date
 from fastapi import APIRouter, Depends, Header, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.dependencies import get_current_user_id, get_db_session, get_event_publisher
+from app.api.dependencies import get_current_user_id, get_db_session
 from app.api.errors import raise_service_error
 from app.api.presenters import transaction_to_out
 from app.schemas.pagination import PaginationParams
@@ -12,6 +12,7 @@ from app.schemas.responses import ApiResponse, PaginatedResponse
 from app.schemas.transactions import TransactionCreate, TransactionUpdate
 from app.services import summaries as summary_service
 from app.services import idempotency as idempotency_service
+from app.services import outbox as outbox_service
 from app.services import transactions as transaction_service
 from app.services.exceptions import ServiceError
 
@@ -24,7 +25,6 @@ async def create_transaction(
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
     user_id: uuid.UUID = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_db_session),
-    event_publisher=Depends(get_event_publisher),
 ) -> ApiResponse:
     existing = await idempotency_service.get_record(
         session,
@@ -40,6 +40,7 @@ async def create_transaction(
     try:
         transaction = await transaction_service.create_transaction(session, user_id, payload)
     except ServiceError as exc:
+        await session.rollback()
         raise_service_error(exc)
     await idempotency_service.save_record(
         session,
@@ -50,22 +51,18 @@ async def create_transaction(
         "transaction",
         transaction.id,
     )
+    await outbox_service.enqueue_event(
+        session,
+        aggregate_type="transaction",
+        aggregate_id=transaction.id,
+        routing_key="transaction.created",
+        payload=transaction_event_payload("transaction.created", user_id, transaction),
+    )
+    await session.commit()
     message = (
         "Transfer transaction created successfully"
         if payload.type == "TRANSFER"
         else "Transaction created successfully"
-    )
-    await event_publisher.publish(
-        "transaction.created",
-        {
-            "event_type": "transaction.created",
-            "user_id": str(user_id),
-            "transaction_id": str(transaction.id),
-            "type": transaction.type,
-            "amount": transaction.amount,
-            "currency_code": transaction.currency_code,
-            "transaction_date": transaction.transaction_date,
-        },
     )
     return ApiResponse(message=message, data=transaction_to_out(transaction))
 
@@ -171,24 +168,20 @@ async def update_transaction(
     payload: TransactionUpdate,
     user_id: uuid.UUID = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_db_session),
-    event_publisher=Depends(get_event_publisher),
 ) -> ApiResponse:
     try:
         transaction = await transaction_service.update_transaction(session, user_id, transaction_id, payload)
     except ServiceError as exc:
+        await session.rollback()
         raise_service_error(exc)
-    await event_publisher.publish(
-        "transaction.updated",
-        {
-            "event_type": "transaction.updated",
-            "user_id": str(user_id),
-            "transaction_id": str(transaction.id),
-            "type": transaction.type,
-            "amount": transaction.amount,
-            "currency_code": transaction.currency_code,
-            "transaction_date": transaction.transaction_date,
-        },
+    await outbox_service.enqueue_event(
+        session,
+        aggregate_type="transaction",
+        aggregate_id=transaction.id,
+        routing_key="transaction.updated",
+        payload=transaction_event_payload("transaction.updated", user_id, transaction),
     )
+    await session.commit()
     return ApiResponse(message="Transaction updated successfully", data=transaction_to_out(transaction))
 
 
@@ -197,18 +190,31 @@ async def delete_transaction(
     transaction_id: uuid.UUID,
     user_id: uuid.UUID = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_db_session),
-    event_publisher=Depends(get_event_publisher),
 ) -> ApiResponse:
     try:
+        transaction = await transaction_service.get_transaction(session, user_id, transaction_id)
         await transaction_service.delete_transaction(session, user_id, transaction_id)
     except ServiceError as exc:
+        await session.rollback()
         raise_service_error(exc)
-    await event_publisher.publish(
-        "transaction.deleted",
-        {
-            "event_type": "transaction.deleted",
-            "user_id": str(user_id),
-            "transaction_id": str(transaction_id),
-        },
+    await outbox_service.enqueue_event(
+        session,
+        aggregate_type="transaction",
+        aggregate_id=transaction_id,
+        routing_key="transaction.deleted",
+        payload=transaction_event_payload("transaction.deleted", user_id, transaction),
     )
+    await session.commit()
     return ApiResponse(message="Transaction deleted successfully", data=None)
+
+
+def transaction_event_payload(event_type: str, user_id: uuid.UUID, transaction) -> dict:
+    return {
+        "event_type": event_type,
+        "user_id": str(user_id),
+        "transaction_id": str(transaction.id),
+        "type": transaction.type,
+        "amount": str(transaction.amount),
+        "currency_code": transaction.currency_code,
+        "transaction_date": transaction.transaction_date.isoformat(),
+    }

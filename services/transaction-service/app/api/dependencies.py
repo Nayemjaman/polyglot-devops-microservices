@@ -28,10 +28,6 @@ async def get_attachment_storage(request: Request) -> AttachmentStorage:
     return request.app.state.attachment_storage
 
 
-async def get_event_publisher(request: Request):
-    return request.app.state.event_publisher
-
-
 async def get_current_user_id(
     request: Request,
     authorization: str | None = Header(default=None),

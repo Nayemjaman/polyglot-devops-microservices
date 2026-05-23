@@ -585,6 +585,48 @@ services:
         condition: service_healthy
       transaction-minio-init:
         condition: service_completed_successfully
+    environment:
+      APP_NAME: ${TRANSACTION_APP_NAME:-transaction-service}
+      APP_ENV: ${TRANSACTION_APP_ENV:-production}
+      HOST: 0.0.0.0
+      PORT: 8002
+      AUTH_SERVICE_URL: http://auth-service:8000
+      HTTP_TIMEOUT_SECONDS: ${TRANSACTION_HTTP_TIMEOUT_SECONDS:-5}
+      DATABASE_URL: postgresql+asyncpg://${TRANSACTION_DB_USER:-transaction_service_user}:${TRANSACTION_DB_PASSWORD:?TRANSACTION_DB_PASSWORD is required}@transaction-pgbouncer:6432/${TRANSACTION_DB_NAME:-transaction_service_db}?prepared_statement_cache_size=0
+      CORS_ALLOWED_ORIGINS: ${TRANSACTION_CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      GRPC_SHARED_SECRET: ${TRANSACTION_GRPC_SHARED_SECRET:?TRANSACTION_GRPC_SHARED_SECRET is required}
+      DATABASE_ECHO: ${TRANSACTION_DATABASE_ECHO:-False}
+      DATABASE_POOL_SIZE: ${TRANSACTION_DATABASE_POOL_SIZE:-5}
+      DATABASE_MAX_OVERFLOW: ${TRANSACTION_DATABASE_MAX_OVERFLOW:-10}
+      STORAGE_ENDPOINT_URL: http://transaction-minio:9000
+      STORAGE_REGION: ${TRANSACTION_STORAGE_REGION:-us-east-1}
+      STORAGE_ACCESS_KEY: ${TRANSACTION_STORAGE_ACCESS_KEY:?TRANSACTION_STORAGE_ACCESS_KEY is required}
+      STORAGE_SECRET_KEY: ${TRANSACTION_STORAGE_SECRET_KEY:?TRANSACTION_STORAGE_SECRET_KEY is required}
+      STORAGE_BUCKET_NAME: ${TRANSACTION_STORAGE_BUCKET_NAME:-transaction-attachments}
+      STORAGE_PUBLIC_BASE_URL: ${TRANSACTION_STORAGE_PUBLIC_BASE_URL:-http://127.0.0.1:9000}
+      STORAGE_PATH_PREFIX: ${TRANSACTION_STORAGE_PATH_PREFIX:-attachments}
+    expose:
+      - "8002"
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import socket; s=socket.create_connection(('127.0.0.1', 8002), 3); s.close()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  transaction-outbox-publisher:
+    <<: *app-runtime
+    build:
+      context: ../services/transaction-service
+    container_name: transaction-outbox-publisher
+    restart: unless-stopped
+    depends_on:
+      transaction-pgbouncer:
+        condition: service_healthy
+      transaction-migrate:
+        condition: service_completed_successfully
       rabbitmq:
         condition: service_healthy
     environment:
@@ -609,16 +651,15 @@ services:
       STORAGE_PATH_PREFIX: ${TRANSACTION_STORAGE_PATH_PREFIX:-attachments}
       RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-app}:${RABBITMQ_DEFAULT_PASS:-app_password}@rabbitmq:5672/
       RABBITMQ_EXCHANGE: ${RABBITMQ_EXCHANGE:-finance.events}
-    expose:
-      - "8002"
+      OUTBOX_BATCH_SIZE: ${TRANSACTION_OUTBOX_BATCH_SIZE:-50}
+      OUTBOX_POLL_INTERVAL_SECONDS: ${TRANSACTION_OUTBOX_POLL_INTERVAL_SECONDS:-2}
+      OUTBOX_MAX_ATTEMPTS: ${TRANSACTION_OUTBOX_MAX_ATTEMPTS:-10}
+    command:
+      - python
+      - -m
+      - app.workers.outbox_publisher
     networks:
       - backend
-    healthcheck:
-      test: ["CMD-SHELL", "python -c \"import socket; s=socket.create_connection(('127.0.0.1', 8002), 3); s.close()\""]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 15s
 
   transaction-migrate:
     <<: *app-runtime
