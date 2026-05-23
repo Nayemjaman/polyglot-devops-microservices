@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ComponentProps, type ReactNode } from "react";
 import {
   BarChart3,
   Bell,
   CreditCard,
   FileText,
-  Landmark,
   Link as LinkIcon,
   Paperclip,
   RefreshCw,
@@ -15,55 +14,36 @@ import {
 } from "lucide-react";
 import { LogoutButton } from "@/components/auth/logout-button";
 import Link from "next/link";
-import { updateMe } from "@/lib/auth-api";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Notice, Panel } from "@/components/ui/panel";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { OverviewSection } from "@/features/dashboard/overview-section";
+import { useWorkspaceData } from "@/features/dashboard/use-workspace-data";
+import type { ListMeta, ListState, RunAction, SectionId, WorkspaceData } from "@/features/dashboard/types";
+import { completeVisibleExportJobs } from "@/features/reports/export-jobs";
 import {
   financeApi,
   downloadReportFile,
   paginationPage,
   paginationTotalPages,
+  type JsonValue,
   type PaginatedResponse,
   type Budget,
   type BudgetAlertRule,
   type BudgetCategory,
   type Category,
-  type ExportJob,
   type PaymentMethod,
   type RecurringTransaction,
-  type Tag,
   type Transaction,
   type Wallet
 } from "@/lib/finance-api";
-import { persistUser, type AuthUser } from "@/lib/auth";
+import type { AuthUser } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
-type SectionId = "overview" | "setup" | "transactions" | "budgets" | "reports";
-
-type WorkspaceData = {
-  wallets: Wallet[];
-  categories: Category[];
-  paymentMethods: PaymentMethod[];
-  tags: Tag[];
-  transactions: Transaction[];
-  recurring: RecurringTransaction[];
-  budgets: Budget[];
-  exportJobs: ExportJob[];
-};
-
-type ListMeta = {
-  page: number;
-  totalPages: number;
-};
-
-type ListState<T> = {
-  items: T[];
-  meta: ListMeta;
-};
+type PreviewOutput = JsonValue | null;
 
 const currentDate = new Date();
 const initialYear = currentDate.getFullYear();
@@ -77,17 +57,6 @@ const navItems: Array<{ id: SectionId; label: string; icon: typeof BarChart3 }> 
   { id: "reports", label: "Reports", icon: FileText }
 ];
 
-const emptyData: WorkspaceData = {
-  wallets: [],
-  categories: [],
-  paymentMethods: [],
-  tags: [],
-  transactions: [],
-  recurring: [],
-  budgets: [],
-  exportJobs: []
-};
-
 function listState<T>(items: T[] = [], page = 1, totalPages = 1): ListState<T> {
   return { items, meta: { page, totalPages } };
 }
@@ -100,93 +69,14 @@ function sectionFromHash(): SectionId {
   return navItems.some((item) => item.id === section) ? (section as SectionId) : "overview";
 }
 
-async function completeVisibleExportJobs(jobs: ExportJob[]) {
-  return Promise.all(
-    jobs.map(async (job) => {
-      const id = job.id || job.export_job_id;
-      if (!id || (job.status === "COMPLETED" && job.file?.id)) {
-        return job;
-      }
-      if (job.status === "PENDING" || job.status === "PROCESSING" || !job.file?.id) {
-        try {
-          const response = await financeApi.reports.exportJob(id);
-          return response.data;
-        } catch {
-          return job;
-        }
-      }
-      return job;
-    })
-  );
-}
-
 export function FinanceWorkspace({ user }: { user: AuthUser }) {
   const [activeSection, setActiveSection] = useState<SectionId>(sectionFromHash);
-  const [data, setData] = useState<WorkspaceData>(emptyData);
+  const { data, isLoading, busyAction, message, error, setMessage, loadCoreData, runAction } = useWorkspaceData();
   const [year, setYear] = useState(initialYear);
   const [month, setMonth] = useState(initialMonth);
-  const [isLoading, setIsLoading] = useState(true);
-  const [busyAction, setBusyAction] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [reportOutput, setReportOutput] = useState<unknown>(null);
-  const [budgetOutput, setBudgetOutput] = useState<unknown>(null);
-  const [transactionOutput, setTransactionOutput] = useState<unknown>(null);
-
-  async function runAction(action: string, work: () => Promise<string | void>, refresh = true) {
-    setBusyAction(action);
-    setError(null);
-    setMessage(null);
-    try {
-      const result = await work();
-      setMessage(result || "Done");
-      if (refresh) {
-        await loadCoreData(false);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Request failed");
-    } finally {
-      setBusyAction(null);
-    }
-  }
-
-  async function loadCoreData(showLoader = true) {
-    if (showLoader) {
-      setIsLoading(true);
-    }
-    setError(null);
-    try {
-      const [wallets, categories, paymentMethods, tags, transactions, recurring, budgets, exportJobs] = await Promise.all([
-        financeApi.wallets.list({ page_size: 100 }),
-        financeApi.categories.list({ page_size: 100 }),
-        financeApi.paymentMethods.list({ page_size: 100 }),
-        financeApi.tags.list(),
-        financeApi.transactions.list({ page_size: 20 }),
-        financeApi.recurring.list({ page_size: 20 }),
-        financeApi.budgets.list({ page_size: 50 }),
-        financeApi.reports.exportJobs({ page_size: 10 })
-      ]);
-      const completedExportJobs = await completeVisibleExportJobs(exportJobs.data);
-      setData({
-        wallets: wallets.data,
-        categories: categories.data,
-        paymentMethods: paymentMethods.data,
-        tags: tags.data,
-        transactions: transactions.data,
-        recurring: recurring.data,
-        budgets: budgets.data,
-        exportJobs: completedExportJobs
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to load workspace data");
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    loadCoreData();
-  }, []);
+  const [reportOutput, setReportOutput] = useState<PreviewOutput>(null);
+  const [budgetOutput, setBudgetOutput] = useState<PreviewOutput>(null);
+  const [transactionOutput, setTransactionOutput] = useState<PreviewOutput>(null);
 
   function chooseSection(section: SectionId) {
     setActiveSection(section);
@@ -288,6 +178,7 @@ export function FinanceWorkspace({ user }: { user: AuthUser }) {
               setBudgetOutput={setBudgetOutput}
               setTransactionOutput={setTransactionOutput}
               setMessage={setMessage}
+              busyAction={busyAction}
             />
           ) : null}
 
@@ -319,191 +210,6 @@ export function FinanceWorkspace({ user }: { user: AuthUser }) {
         </section>
       </div>
     </main>
-  );
-}
-
-type RunAction = (action: string, work: () => Promise<string | void>, refresh?: boolean) => Promise<void>;
-
-function OverviewSection({
-  user,
-  isLoading,
-  year,
-  month,
-  setYear,
-  setMonth,
-  totals,
-  data,
-  reportOutput,
-  budgetOutput,
-  transactionOutput,
-  runAction,
-  setReportOutput,
-  setBudgetOutput,
-  setTransactionOutput,
-  setMessage
-}: {
-  user: AuthUser;
-  isLoading: boolean;
-  year: number;
-  month: number;
-  setYear: (value: number) => void;
-  setMonth: (value: number) => void;
-  totals: { balance: number; income: number; expense: number };
-  data: WorkspaceData;
-  reportOutput: unknown;
-  budgetOutput: unknown;
-  transactionOutput: unknown;
-  runAction: RunAction;
-  setReportOutput: (value: unknown) => void;
-  setBudgetOutput: (value: unknown) => void;
-  setTransactionOutput: (value: unknown) => void;
-  setMessage: (value: string | null) => void;
-}) {
-  return (
-    <div className="grid gap-5">
-      <div className="grid gap-4 md:grid-cols-3">
-        <Metric title="Total balance" value={money(totals.balance)} icon={WalletCards} tone="teal" />
-        <Metric title="Recent income" value={money(totals.income)} icon={Landmark} tone="sky" />
-        <Metric title="Recent expenses" value={money(totals.expense)} icon={CreditCard} tone="amber" />
-      </div>
-
-      <Panel
-        title="Monthly pulse"
-        description="Run live summaries for the selected month and inspect the returned data in a clean preview."
-        action={<PeriodPicker year={year} month={month} setYear={setYear} setMonth={setMonth} />}
-      >
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() =>
-              runAction(
-                "reports-dashboard",
-                async () => {
-                  const response = await financeApi.reports.dashboard(year, month);
-                  setReportOutput(response.data);
-                  return response.message;
-                },
-                false
-              )
-            }
-          >
-            Dashboard
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() =>
-              runAction(
-                "budget-monthly",
-                async () => {
-                  const response = await financeApi.budgets.monthlyStatus(year, month);
-                  setBudgetOutput(response.data);
-                  return response.message;
-                },
-                false
-              )
-            }
-          >
-            Budget status
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() =>
-              runAction(
-                "summary-monthly",
-                async () => {
-                  const response = await financeApi.transactions.monthlySummary(year, month);
-                  setTransactionOutput(response.data);
-                  return response.message;
-                },
-                false
-              )
-            }
-          >
-            Monthly summary
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() =>
-              runAction(
-                "summary-category",
-                async () => {
-                  const response = await financeApi.transactions.categorySummary(year, month);
-                  setTransactionOutput(response.data);
-                  return response.message;
-                },
-                false
-              )
-            }
-          >
-            Category summary
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() =>
-              runAction(
-                "summary-yearly",
-                async () => {
-                  const response = await financeApi.transactions.yearlySummary(year);
-                  setTransactionOutput(response.data);
-                  return response.message;
-                },
-                false
-              )
-            }
-          >
-            Yearly summary
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() =>
-              runAction(
-                "summary-wallet",
-                async () => {
-                  const response = await financeApi.transactions.walletSummary(year, month);
-                  setTransactionOutput(response.data);
-                  return response.message;
-                },
-                false
-              )
-            }
-          >
-            Wallet summary
-          </Button>
-        </div>
-        <div className="mt-5 grid gap-4 lg:grid-cols-3">
-          <ReportVisual title="Report preview" value={reportOutput} />
-          <ReportVisual title="Budget preview" value={budgetOutput} />
-          <ReportVisual title="Activity preview" value={transactionOutput} />
-        </div>
-      </Panel>
-
-      <Panel title="Recent activity" description={isLoading ? "Loading..." : "Latest records from your workspace."}>
-        <div className="grid gap-3">
-          {data.transactions.slice(0, 6).map((item) => (
-            <div key={item.id} className="flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="font-semibold">{item.title}</p>
-                <p className="text-sm text-muted-foreground">
-                  {item.type} · {item.wallet?.name} · {item.transaction_date}
-                </p>
-              </div>
-              <span className="font-bold">{money(item.amount, item.currency_code)}</span>
-            </div>
-          ))}
-          {!data.transactions.length ? <EmptyState text="Create a wallet, category, payment method, then add your first transaction." /> : null}
-        </div>
-      </Panel>
-
-      <Panel title="Profile settings" description="Update your personal details and preferred money settings.">
-        <ProfileForm user={user} setMessage={setMessage} />
-      </Panel>
-    </div>
   );
 }
 
@@ -704,18 +410,6 @@ function TransactionsSection({ data, runAction, busyAction }: { data: WorkspaceD
                   >
                     Details
                   </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    onClick={() =>
-                      runAction("quick-update-transaction", async () =>
-                        (await financeApi.transactions.update(item.id, { title: `${item.title} updated` })).message
-                      )
-                    }
-                  >
-                    Quick edit
-                  </Button>
                   <IconDelete onClick={() => runAction("delete-transaction", async () => (await financeApi.transactions.delete(item.id)).message)} />
                 </div>
               </div>
@@ -773,7 +467,7 @@ function BudgetsSection({
   data: WorkspaceData;
   runAction: RunAction;
   busyAction: string | null;
-  setBudgetOutput: (value: unknown) => void;
+  setBudgetOutput: (value: PreviewOutput) => void;
 }) {
   const [selectedBudgetId, setSelectedBudgetId] = useState("");
   const [budgetCategories, setBudgetCategories] = useState<BudgetCategory[]>([]);
@@ -1067,8 +761,8 @@ function ReportsSection({
   month: number;
   setYear: (value: number) => void;
   setMonth: (value: number) => void;
-  output: unknown;
-  setOutput: (value: unknown) => void;
+  output: PreviewOutput;
+  setOutput: (value: PreviewOutput) => void;
   runAction: RunAction;
   busyAction: string | null;
 }) {
@@ -1103,8 +797,10 @@ function ReportsSection({
       <Panel title="Reports" description="Generate every available report for the selected period." action={<PeriodPicker year={year} month={month} setYear={setYear} setMonth={setMonth} />}>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {reportButtons.map(([label, request]) => (
-            <Button
+            <ActionButton
               key={label}
+              action={`report-${label}`}
+              busyAction={busyAction}
               type="button"
               variant="secondary"
               onClick={() =>
@@ -1120,7 +816,7 @@ function ReportsSection({
               }
             >
               {label}
-            </Button>
+            </ActionButton>
           ))}
         </div>
         <div className="mt-5">
@@ -1145,7 +841,9 @@ function ReportsSection({
                   <p className="text-sm text-muted-foreground">{job.status}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button
+                  <ActionButton
+                    action="export-job"
+                    busyAction={busyAction}
                     type="button"
                     variant="secondary"
                     onClick={() =>
@@ -1157,7 +855,14 @@ function ReportsSection({
                             return "Download started";
                           }
                           const response = await financeApi.reports.exportJob(id);
-                          setOutput(response.data);
+                          setOutput({
+                            report_type: response.data.report_type,
+                            export_type: response.data.export_type,
+                            status: response.data.status,
+                            error_message: response.data.error_message ?? null,
+                            requested_at: response.data.requested_at,
+                            file_name: response.data.file?.file_name ?? null
+                          });
                           setExportJobs((current) => ({
                             ...current,
                             items: current.items.map((item) => ((item.id || item.export_job_id) === id ? response.data : item))
@@ -1172,7 +877,7 @@ function ReportsSection({
                     }
                   >
                     {job.file?.id ? "Download" : "Prepare"}
-                  </Button>
+                  </ActionButton>
                 </div>
               </div>
             );
@@ -1259,50 +964,6 @@ function WalletEditForm({ wallet, runAction, busyAction }: { wallet: Wallet; run
       </SimpleForm>
       {details ? <DetailSummary title="Wallet details" value={details} /> : null}
     </EditShell>
-  );
-}
-
-function ProfileForm({ user, setMessage }: { user: AuthUser; setMessage: (value: string | null) => void }) {
-  const [error, setError] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-
-  async function submit(form: FormData) {
-    setIsSaving(true);
-    setError(null);
-    try {
-      const response = await updateMe({
-        first_name: text(form, "first_name"),
-        last_name: text(form, "last_name"),
-        profile: {
-          phone: text(form, "phone"),
-          avatar_url: text(form, "avatar_url"),
-          country: text(form, "country"),
-          currency_code: text(form, "currency_code"),
-          timezone: text(form, "timezone"),
-          date_of_birth: text(form, "date_of_birth") || null
-        }
-      });
-      persistUser(response.user);
-      setMessage("Profile updated successfully");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to update profile");
-    } finally {
-      setIsSaving(false);
-    }
-  }
-
-  return (
-    <SimpleForm button="Save profile" busy={isSaving} onSubmit={submit}>
-      <Field label="First name"><Input name="first_name" defaultValue={user.first_name} /></Field>
-      <Field label="Last name"><Input name="last_name" defaultValue={user.last_name} /></Field>
-      <Field label="Phone"><Input name="phone" defaultValue={user.profile?.phone || ""} /></Field>
-      <Field label="Country"><Input name="country" defaultValue={user.profile?.country || ""} /></Field>
-      <Field label="Currency"><Input name="currency_code" defaultValue={user.profile?.currency_code || "USD"} maxLength={3} /></Field>
-      <Field label="Timezone"><Input name="timezone" defaultValue={user.profile?.timezone || ""} placeholder="Asia/Dhaka" /></Field>
-      <Field label="Birth date"><Input name="date_of_birth" type="date" defaultValue={user.profile?.date_of_birth || ""} /></Field>
-      <Field label="Avatar URL"><Input name="avatar_url" defaultValue={user.profile?.avatar_url || ""} /></Field>
-      {error ? <div className="sm:col-span-2 xl:col-span-3 2xl:col-span-4"><Notice tone="error">{error}</Notice></div> : null}
-    </SimpleForm>
   );
 }
 
@@ -1944,6 +1605,24 @@ function ExportForm({
   );
 }
 
+function ActionButton({
+  action,
+  busyAction,
+  children,
+  disabled,
+  ...props
+}: ComponentProps<typeof Button> & {
+  action: string;
+  busyAction: string | null;
+}) {
+  const isBusy = busyAction === action;
+  return (
+    <Button {...props} disabled={disabled || isBusy}>
+      {isBusy ? "Working..." : children}
+    </Button>
+  );
+}
+
 function SimpleForm({
   children,
   button,
@@ -2122,7 +1801,7 @@ function EntityList<T extends { id: string }>({
           <div className="flex flex-wrap gap-2">
             {onToggle ? (
               <Button type="button" variant="secondary" size="sm" onClick={() => onToggle(item)}>
-                Quick edit
+                Toggle status
               </Button>
             ) : null}
             {onDelete ? <IconDelete onClick={() => onDelete(item.id)} /> : null}
@@ -2144,39 +1823,6 @@ function EditShell({ title, children }: { title: string; children: ReactNode }) 
         </span>
       </div>
       {children}
-    </div>
-  );
-}
-
-function Metric({ title, value, icon: Icon, tone }: { title: string; value: string; icon: typeof WalletCards; tone: "teal" | "sky" | "amber" }) {
-  return (
-    <div className="overflow-hidden rounded-lg border bg-white shadow-sm">
-      <div
-        className={cn(
-          "h-1",
-          tone === "teal" && "bg-teal-500",
-          tone === "sky" && "bg-sky-500",
-          tone === "amber" && "bg-amber-400"
-        )}
-      />
-      <div className="p-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm text-muted-foreground">{title}</p>
-          <p className="mt-2 text-3xl font-black">{value}</p>
-        </div>
-        <div
-          className={cn(
-            "grid h-12 w-12 place-items-center rounded-md",
-            tone === "teal" && "bg-teal-50 text-teal-700",
-            tone === "sky" && "bg-sky-50 text-sky-700",
-            tone === "amber" && "bg-amber-50 text-amber-700"
-          )}
-        >
-          <Icon size={24} />
-        </div>
-      </div>
-      </div>
     </div>
   );
 }
@@ -2262,7 +1908,7 @@ function IconDelete({ onClick }: { onClick: () => void }) {
   );
 }
 
-function ReportVisual({ title, value }: { title: string; value: unknown }) {
+function ReportVisual({ title, value }: { title: string; value: PreviewOutput }) {
   const rows = flattenNumbers(value).slice(0, 8);
   const max = Math.max(...rows.map((row) => Math.abs(row.value)), 1);
   return (
@@ -2366,14 +2012,14 @@ function fromPaginated<T>(response: PaginatedResponse<T>): ListState<T> {
   return listState(response.data, paginationPage(response as PaginatedResponse<unknown>), paginationTotalPages(response as PaginatedResponse<unknown>));
 }
 
-function flattenNumbers(value: unknown, prefix = ""): Array<{ label: string; value: number }> {
+function flattenNumbers(value: JsonValue | null, prefix = ""): Array<{ label: string; value: number }> {
   if (!value || typeof value !== "object") {
     return [];
   }
   if (Array.isArray(value)) {
     return value.flatMap((item, index) => flattenNumbers(item, `${prefix}${index + 1}.`));
   }
-  return Object.entries(value as Record<string, unknown>).flatMap(([key, item]) => {
+  return Object.entries(value as Record<string, JsonValue>).flatMap(([key, item]) => {
     const label = prefix ? `${prefix}${key}` : key;
     if (typeof item === "number") {
       return [{ label, value: item }];

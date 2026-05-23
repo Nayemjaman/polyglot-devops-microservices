@@ -12,9 +12,7 @@ export function LogoutButton() {
   async function handleLogout() {
     const refresh = getRefreshToken();
     try {
-      if (refresh) {
-        await logout(refresh);
-      }
+      await logout(refresh);
     } finally {
       clearSession();
       router.push("/login");

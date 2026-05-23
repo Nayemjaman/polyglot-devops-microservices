@@ -26,14 +26,8 @@ export function SessionGate({ children }: SessionGateProps) {
         persistUser(me.user);
         setUser(me.user);
       } catch {
-        const refresh = getRefreshToken();
-        if (!refresh) {
-          clearSession();
-          router.replace("/login");
-          return;
-        }
-
         try {
+          const refresh = getRefreshToken();
           const refreshed = await refreshSession(refresh);
           persistTokens(refreshed.tokens);
           const me = await fetchMe();

@@ -1,6 +1,7 @@
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
+from django.conf import settings
 
 from .base_views import AsyncAPIView
 from .models import User
@@ -23,6 +24,28 @@ from .services import (
     update_user,
 )
 
+REFRESH_COOKIE_NAME = 'polyglot_refresh'
+
+
+def refresh_cookie_settings():
+    return {
+        'httponly': True,
+        'secure': not settings.DEBUG,
+        'samesite': 'Lax',
+        'path': '/',
+        'max_age': int(settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'].total_seconds()),
+    }
+
+
+def response_with_refresh_cookie(payload, tokens, status_code=status.HTTP_200_OK):
+    response = Response(payload, status=status_code)
+    response.set_cookie(REFRESH_COOKIE_NAME, tokens['refresh'], **refresh_cookie_settings())
+    return response
+
+
+def refresh_from_request(request, data):
+    return data.get('refresh') or request.COOKIES.get(REFRESH_COOKIE_NAME)
+
 
 class RegisterView(AsyncAPIView):
     async def post(self, request):
@@ -32,12 +55,13 @@ class RegisterView(AsyncAPIView):
             raise ValidationError({'detail': 'Email or username already exists.'})
         tokens = await issue_token_pair(user)
 
-        return Response(
+        return response_with_refresh_cookie(
             {
                 'user': await serialize_user(user),
-                'tokens': tokens,
+                'tokens': {'access': tokens['access']},
             },
-            status=status.HTTP_201_CREATED,
+            tokens,
+            status_code=status.HTTP_201_CREATED,
         )
 
 
@@ -47,19 +71,23 @@ class LoginView(AsyncAPIView):
         user = await authenticate_user(data['email'], data['password'])
         tokens = await issue_token_pair(user)
 
-        return Response(
+        return response_with_refresh_cookie(
             {
                 'user': await serialize_user(user),
-                'tokens': tokens,
-            }
+                'tokens': {'access': tokens['access']},
+            },
+            tokens,
         )
 
 
 class RefreshView(AsyncAPIView):
     async def post(self, request):
         data = validate_serializer(RefreshSerializer, request.data)
-        tokens = await rotate_refresh_token(data['refresh'])
-        return Response({'tokens': tokens})
+        refresh = refresh_from_request(request, data)
+        if not refresh:
+            raise ValidationError({'detail': 'Refresh token is required.'})
+        tokens = await rotate_refresh_token(refresh)
+        return response_with_refresh_cookie({'tokens': {'access': tokens['access']}}, tokens)
 
 
 class MeView(AsyncAPIView):
@@ -82,5 +110,9 @@ class MeView(AsyncAPIView):
 class LogoutView(AsyncAPIView):
     async def post(self, request):
         data = validate_serializer(LogoutSerializer, request.data)
-        await revoke_refresh_token(data['refresh'])
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        refresh = refresh_from_request(request, data)
+        if refresh:
+            await revoke_refresh_token(refresh)
+        response = Response(status=status.HTTP_204_NO_CONTENT)
+        response.delete_cookie(REFRESH_COOKIE_NAME, path='/', samesite='Lax')
+        return response

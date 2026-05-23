@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowLeft, CreditCard, RefreshCw } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { SessionGate } from "@/components/auth/session-gate";
 import { Button } from "@/components/ui/button";
 import { Notice, Panel } from "@/components/ui/panel";
@@ -21,7 +21,7 @@ function PaymentMethodDetails({ id }: { id: string }) {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  async function load() {
+  const load = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
@@ -32,11 +32,11 @@ function PaymentMethodDetails({ id }: { id: string }) {
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [id]);
 
   useEffect(() => {
     load();
-  }, [id]);
+  }, [load]);
 
   return (
     <main className="aurora-surface min-h-screen px-4 py-6 sm:px-6">
