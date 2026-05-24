@@ -29,3 +29,22 @@ func TestAPIRouteWithoutAuthorizationIsRejected(t *testing.T) {
 		t.Fatalf("expected %d, got %d", http.StatusUnauthorized, resp.Code)
 	}
 }
+
+func TestHealthRoute(t *testing.T) {
+	cfg := config.Config{
+		AppEnv:             "test",
+		AuthServiceURL:     "http://auth-service",
+		CORSAllowedOrigins: []string{"http://localhost:3000"},
+		RateLimitRequests:  100,
+		RateLimitWindow:    time.Minute,
+	}
+	router := NewRouter(cfg, slog.New(slog.NewJSONHandler(os.Stdout, nil)), nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	resp := httptest.NewRecorder()
+	router.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected %d, got %d", http.StatusOK, resp.Code)
+	}
+}
