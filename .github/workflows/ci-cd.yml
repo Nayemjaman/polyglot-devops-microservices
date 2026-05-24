@@ -301,53 +301,30 @@ jobs:
             services="$(jq -c --arg name "$name" --arg path "$path" '. + [{name: $name, path: $path}]' <<< "$services")"
           }
 
+          add_all_services() {
+            add_service "frontend" "frontend"
+            add_service "auth-service" "services/auth-service"
+            add_service "transaction-service" "services/transaction-service"
+            add_service "budget-service" "services/budget-service"
+            add_service "report-service" "services/report-service"
+          }
+
+          if [ "${{ github.event_name }}" = "push" ]; then
+            add_all_services
+
+            matrix="$(jq -c --argjson include "$services" '{include: $include}' <<< '{}')"
+            echo 'has_changes=true' >> "$GITHUB_OUTPUT"
+            echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.build_all }}" = "true" ]; then
-            add_service "frontend" "frontend"
-            add_service "auth-service" "services/auth-service"
-            add_service "transaction-service" "services/transaction-service"
-            add_service "budget-service" "services/budget-service"
-            add_service "report-service" "services/report-service"
+            add_all_services
 
             matrix="$(jq -c --argjson include "$services" '{include: $include}' <<< '{}')"
             echo 'has_changes=true' >> "$GITHUB_OUTPUT"
             echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
             exit 0
-          fi
-
-          base="${{ github.event.before }}"
-          if [ "$base" = "0000000000000000000000000000000000000000" ]; then
-            base="$(git rev-list --max-parents=0 HEAD)"
-          fi
-
-          changed_files="$(git diff --name-only "$base" "${{ github.sha }}")"
-
-          if grep -qE '^(\.github/workflows/ci-cd\.yml|infra/docker-compose\.ec2\.yml|infra/deploy-ec2\.sh|infra/\.env\.ec2\.example)$' <<< "$changed_files"; then
-            add_service "frontend" "frontend"
-            add_service "auth-service" "services/auth-service"
-            add_service "transaction-service" "services/transaction-service"
-            add_service "budget-service" "services/budget-service"
-            add_service "report-service" "services/report-service"
-
-            matrix="$(jq -c --argjson include "$services" '{include: $include}' <<< '{}')"
-            echo 'has_changes=true' >> "$GITHUB_OUTPUT"
-            echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          if grep -qE '^(frontend/)' <<< "$changed_files"; then
-            add_service "frontend" "frontend"
-          fi
-          if grep -qE '^(services/auth-service/)' <<< "$changed_files"; then
-            add_service "auth-service" "services/auth-service"
-          fi
-          if grep -qE '^(services/transaction-service/)' <<< "$changed_files"; then
-            add_service "transaction-service" "services/transaction-service"
-          fi
-          if grep -qE '^(services/budget-service/|proto/budget/|proto/transaction/)' <<< "$changed_files"; then
-            add_service "budget-service" "services/budget-service"
-          fi
-          if grep -qE '^(services/report-service/)' <<< "$changed_files"; then
-            add_service "report-service" "services/report-service"
           fi
 
           matrix="$(jq -c --argjson include "$services" '{include: $include}' <<< '{}')"
