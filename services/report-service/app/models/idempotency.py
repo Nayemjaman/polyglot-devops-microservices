@@ -12,7 +12,9 @@ from app.models.mixins import UUIDPrimaryKeyMixin
 class IdempotencyRecord(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "idempotency_records"
     __table_args__ = (
-        UniqueConstraint("user_id", "endpoint", "key", name="uq_idempotency_records_user_endpoint_key"),
+        UniqueConstraint(
+            "user_id", "endpoint", "key", name="uq_idempotency_records_user_endpoint_key"
+        ),
         Index("ix_idempotency_records_user_endpoint", "user_id", "endpoint"),
     )
 

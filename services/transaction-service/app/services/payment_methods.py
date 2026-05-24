@@ -27,8 +27,10 @@ async def list_payment_methods(
     is_active: bool | None = None,
     search: str | None = None,
 ) -> tuple[list[PaymentMethod], int]:
-    statement = select(PaymentMethod).where(PaymentMethod.user_id == user_id).order_by(
-        PaymentMethod.created_at.desc()
+    statement = (
+        select(PaymentMethod)
+        .where(PaymentMethod.user_id == user_id)
+        .order_by(PaymentMethod.created_at.desc())
     )
     if method_type:
         statement = statement.where(PaymentMethod.type == method_type)
@@ -62,7 +64,9 @@ async def update_payment_method(
     return await commit_refresh(session, method)
 
 
-async def delete_payment_method(session: AsyncSession, user_id: uuid.UUID, method_id: uuid.UUID) -> None:
+async def delete_payment_method(
+    session: AsyncSession, user_id: uuid.UUID, method_id: uuid.UUID
+) -> None:
     method = await get_payment_method(session, user_id, method_id)
     method.is_active = False
     await session.commit()

@@ -15,8 +15,7 @@ def test_all_report_api_routes_require_authenticated_user_dependency() -> None:
             continue
 
         has_auth_dependency = any(
-            dependency.call is get_current_user_id
-            for dependency in route.dependant.dependencies
+            dependency.call is get_current_user_id for dependency in route.dependant.dependencies
         )
         if not has_auth_dependency:
             methods = ",".join(sorted(route.methods or []))

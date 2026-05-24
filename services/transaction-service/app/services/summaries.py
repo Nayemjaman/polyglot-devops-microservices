@@ -16,7 +16,11 @@ async def monthly_summary(
     month: int,
 ) -> dict[str, Any]:
     rows = await session.execute(
-        select(Transaction.type, func.coalesce(func.sum(Transaction.amount), 0), func.count(Transaction.id))
+        select(
+            Transaction.type,
+            func.coalesce(func.sum(Transaction.amount), 0),
+            func.count(Transaction.id),
+        )
         .where(
             Transaction.user_id == user_id,
             Transaction.is_deleted.is_(False),
@@ -96,7 +100,12 @@ async def category_summary(
     transaction_type: str,
 ) -> dict[str, Any]:
     rows = await session.execute(
-        select(Category.id, Category.name, func.coalesce(func.sum(Transaction.amount), 0), func.count(Transaction.id))
+        select(
+            Category.id,
+            Category.name,
+            func.coalesce(func.sum(Transaction.amount), 0),
+            func.count(Transaction.id),
+        )
         .join(Category, Category.id == Transaction.category_id)
         .where(
             Transaction.user_id == user_id,
@@ -128,7 +137,9 @@ async def category_summary(
     }
 
 
-async def wallet_summary(session: AsyncSession, user_id: uuid.UUID, year: int, month: int) -> dict[str, Any]:
+async def wallet_summary(
+    session: AsyncSession, user_id: uuid.UUID, year: int, month: int
+) -> dict[str, Any]:
     rows = await session.execute(
         select(
             Wallet.id,

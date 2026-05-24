@@ -13,7 +13,9 @@ from app.models import IdempotencyRecord
 
 
 def request_hash(payload: Any) -> str:
-    encoded = json.dumps(payload, sort_keys=True, default=str, separators=(",", ":")).encode("utf-8")
+    encoded = json.dumps(payload, sort_keys=True, default=str, separators=(",", ":")).encode(
+        "utf-8"
+    )
     return hashlib.sha256(encoded).hexdigest()
 
 

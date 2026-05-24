@@ -56,7 +56,9 @@ async def create_empty_attachment_record(
     return attachment
 
 
-async def save_attachment_url(session: AsyncSession, attachment: Attachment, file_url: str) -> Attachment:
+async def save_attachment_url(
+    session: AsyncSession, attachment: Attachment, file_url: str
+) -> Attachment:
     attachment.file_url = file_url
     await session.commit()
     await session.refresh(attachment)

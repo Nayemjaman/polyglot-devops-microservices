@@ -8,7 +8,10 @@ from sqlalchemy.orm import selectinload
 from app.models import Category, RecurringTransaction, Wallet
 from app.schemas.enums import TransactionType
 from app.schemas.pagination import PaginationParams
-from app.schemas.recurring_transactions import RecurringTransactionCreate, RecurringTransactionUpdate
+from app.schemas.recurring_transactions import (
+    RecurringTransactionCreate,
+    RecurringTransactionUpdate,
+)
 from app.services.common import clean_update, get_owned, paginate
 from app.services.exceptions import NotFoundError, ValidationServiceError
 

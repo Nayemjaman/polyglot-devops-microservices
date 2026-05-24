@@ -47,7 +47,9 @@ async def upload_attachment(
             filename=file.filename or "attachment",
         )
         await storage.upload_fileobj(file.file, object_key, content_type)
-        attachment = await attachment_service.save_attachment_url(session, attachment, storage.public_url(object_key))
+        attachment = await attachment_service.save_attachment_url(
+            session, attachment, storage.public_url(object_key)
+        )
     except ServiceError as exc:
         raise_service_error(exc)
 
@@ -82,7 +84,9 @@ async def delete_attachment(
     storage: AttachmentStorage = Depends(get_attachment_storage),
 ) -> ApiResponse:
     try:
-        attachment = await attachment_service.delete_attachment(session, user_id, transaction_id, attachment_id)
+        attachment = await attachment_service.delete_attachment(
+            session, user_id, transaction_id, attachment_id
+        )
         object_key = attachment.file_url.split(f"/{storage.bucket_name}/", 1)[-1]
         if object_key and object_key != attachment.file_url:
             await storage.delete_object(object_key)

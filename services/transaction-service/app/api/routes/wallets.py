@@ -38,7 +38,9 @@ async def list_wallets(
     session: AsyncSession = Depends(get_db_session),
 ) -> PaginatedResponse:
     pagination = PaginationParams(page=page, page_size=page_size)
-    wallets, total = await wallet_service.list_wallets(session, user_id, pagination, type, is_active, search)
+    wallets, total = await wallet_service.list_wallets(
+        session, user_id, pagination, type, is_active, search
+    )
     return PaginatedResponse(
         message="Wallets fetched successfully",
         data=[WalletOut.model_validate(wallet) for wallet in wallets],

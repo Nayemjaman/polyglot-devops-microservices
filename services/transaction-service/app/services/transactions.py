@@ -15,7 +15,9 @@ from app.services.common import clean_update, get_owned, paginate
 from app.services.exceptions import NotFoundError, ValidationServiceError
 
 
-def apply_balance(wallet: Wallet, transaction_type: str, amount: Decimal, reverse: bool = False) -> None:
+def apply_balance(
+    wallet: Wallet, transaction_type: str, amount: Decimal, reverse: bool = False
+) -> None:
     multiplier = Decimal("-1") if reverse else Decimal("1")
     if transaction_type == TransactionType.INCOME:
         wallet.current_balance += amount * multiplier
@@ -48,7 +50,11 @@ async def validate_transaction_refs(
     if category.type != transaction_type:
         raise ValidationServiceError(
             "Validation failed",
-            {"category_id": [f"{transaction_type} transaction requires {transaction_type} category"]},
+            {
+                "category_id": [
+                    f"{transaction_type} transaction requires {transaction_type} category"
+                ]
+            },
         )
     return wallet, category, method
 
@@ -60,7 +66,9 @@ async def set_transaction_tags(
     tag_names: list[str],
 ) -> None:
     names = sorted({name.strip().lower() for name in tag_names if name.strip()})
-    await session.execute(delete(TransactionTag).where(TransactionTag.transaction_id == transaction.id))
+    await session.execute(
+        delete(TransactionTag).where(TransactionTag.transaction_id == transaction.id)
+    )
     await session.flush()
     for name in names:
         tag = await session.scalar(select(Tag).where(Tag.user_id == user_id, Tag.name == name))
@@ -147,13 +155,19 @@ async def list_transactions(
         statement = statement.where(Transaction.transaction_date <= end_date)
     if search:
         pattern = f"%{search}%"
-        statement = statement.where(or_(Transaction.title.ilike(pattern), Transaction.description.ilike(pattern)))
-    sort_column = Transaction.created_at if sort_by == "created_at" else Transaction.transaction_date
+        statement = statement.where(
+            or_(Transaction.title.ilike(pattern), Transaction.description.ilike(pattern))
+        )
+    sort_column = (
+        Transaction.created_at if sort_by == "created_at" else Transaction.transaction_date
+    )
     statement = statement.order_by(sort_column.asc() if sort_order == "asc" else sort_column.desc())
     return await paginate(session, statement, pagination)
 
 
-async def get_transaction(session: AsyncSession, user_id: uuid.UUID, transaction_id: uuid.UUID) -> Transaction:
+async def get_transaction(
+    session: AsyncSession, user_id: uuid.UUID, transaction_id: uuid.UUID
+) -> Transaction:
     transaction = await session.scalar(
         select(Transaction)
         .options(*transaction_options())
@@ -200,7 +214,9 @@ async def update_transaction(
     return await get_transaction(session, user_id, transaction.id)
 
 
-async def delete_transaction(session: AsyncSession, user_id: uuid.UUID, transaction_id: uuid.UUID) -> None:
+async def delete_transaction(
+    session: AsyncSession, user_id: uuid.UUID, transaction_id: uuid.UUID
+) -> None:
     transaction = await get_transaction(session, user_id, transaction_id)
     apply_balance(transaction.wallet, transaction.type, transaction.amount, reverse=True)
     transaction.is_deleted = True

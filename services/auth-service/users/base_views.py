@@ -16,7 +16,9 @@ class AsyncAPIView(APIView):
 
         try:
             self.initial(request, *args, **kwargs)
-            handler = getattr(self, request.method.lower(), self.http_method_not_allowed)
+            handler = getattr(
+                self, request.method.lower(), self.http_method_not_allowed
+            )
             if asyncio.iscoroutinefunction(handler):
                 response = await handler(request, *args, **kwargs)
             else:

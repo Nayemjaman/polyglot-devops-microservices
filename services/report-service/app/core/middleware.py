@@ -65,7 +65,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
 
 def add_security_middleware(app, settings) -> None:
-    origins = [origin.strip() for origin in settings.cors_allowed_origins.split(",") if origin.strip()]
+    origins = [
+        origin.strip() for origin in settings.cors_allowed_origins.split(",") if origin.strip()
+    ]
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins,

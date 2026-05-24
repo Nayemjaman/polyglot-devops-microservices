@@ -42,7 +42,9 @@ class SmokeClient:
         expected = expected or {200}
         url = base_url.rstrip("/") + path
         if query:
-            clean_query = {key: value for key, value in query.items() if value is not None}
+            clean_query = {
+                key: value for key, value in query.items() if value is not None
+            }
             url += "?" + parse.urlencode(clean_query)
 
         req_headers = {"Accept": "application/json"}
@@ -113,7 +115,9 @@ class SmokeClient:
         print("-" * 95)
         for result in self.results:
             works = "true" if result["ok"] else "false"
-            print(f"{works:<7} {result['method']:<6} {result['path']:<60} {result['name']}")
+            print(
+                f"{works:<7} {result['method']:<6} {result['path']:<60} {result['name']}"
+            )
         print()
         print(f"Summary: {passed}/{total} passed, {failed} failed")
         return 0 if failed == 0 else 1
@@ -141,7 +145,9 @@ def auth_tokens(response: dict[str, Any] | None) -> tuple[str | None, str | None
     return tokens.get("access"), tokens.get("refresh")
 
 
-def multipart_file(field: str, filename: str, content: bytes, content_type: str) -> tuple[bytes, str]:
+def multipart_file(
+    field: str, filename: str, content: bytes, content_type: str
+) -> tuple[bytes, str]:
     boundary = f"----api-smoke-{uuid.uuid4().hex}"
     lines = [
         f"--{boundary}\r\n".encode(),
@@ -226,8 +232,12 @@ def run(args: argparse.Namespace) -> int:
 
     client.request("transaction health", "GET", args.transaction_url, "/health")
     client.request("transaction db health", "GET", args.transaction_url, "/health/db")
-    client.request("transaction storage health", "GET", args.transaction_url, "/health/storage")
-    client.request("transaction hello", "GET", args.transaction_url, "/hello", token=access_token)
+    client.request(
+        "transaction storage health", "GET", args.transaction_url, "/health/storage"
+    )
+    client.request(
+        "transaction hello", "GET", args.transaction_url, "/hello", token=access_token
+    )
 
     wallet = client.request(
         "create wallet",
@@ -245,9 +255,17 @@ def run(args: argparse.Namespace) -> int:
         expected={201},
     )
     wallet_id = data_id(wallet)
-    client.request("list wallets", "GET", args.transaction_url, "/api/wallets", token=access_token)
+    client.request(
+        "list wallets", "GET", args.transaction_url, "/api/wallets", token=access_token
+    )
     if wallet_id:
-        client.request("get wallet", "GET", args.transaction_url, f"/api/wallets/{wallet_id}", token=access_token)
+        client.request(
+            "get wallet",
+            "GET",
+            args.transaction_url,
+            f"/api/wallets/{wallet_id}",
+            token=access_token,
+        )
         client.request(
             "update wallet",
             "PATCH",
@@ -272,9 +290,21 @@ def run(args: argparse.Namespace) -> int:
         expected={201},
     )
     category_id = data_id(category)
-    client.request("list categories", "GET", args.transaction_url, "/api/categories", token=access_token)
+    client.request(
+        "list categories",
+        "GET",
+        args.transaction_url,
+        "/api/categories",
+        token=access_token,
+    )
     if category_id:
-        client.request("get category", "GET", args.transaction_url, f"/api/categories/{category_id}", token=access_token)
+        client.request(
+            "get category",
+            "GET",
+            args.transaction_url,
+            f"/api/categories/{category_id}",
+            token=access_token,
+        )
         client.request(
             "update category",
             "PATCH",
@@ -294,7 +324,13 @@ def run(args: argparse.Namespace) -> int:
         expected={201},
     )
     payment_method_id = data_id(payment_method)
-    client.request("list payment methods", "GET", args.transaction_url, "/api/payment-methods", token=access_token)
+    client.request(
+        "list payment methods",
+        "GET",
+        args.transaction_url,
+        "/api/payment-methods",
+        token=access_token,
+    )
     if payment_method_id:
         client.request(
             "update payment method",
@@ -315,7 +351,9 @@ def run(args: argparse.Namespace) -> int:
         expected={201},
     )
     tag_id = data_id(tag)
-    client.request("list tags", "GET", args.transaction_url, "/api/tags", token=access_token)
+    client.request(
+        "list tags", "GET", args.transaction_url, "/api/tags", token=access_token
+    )
 
     transaction_id = None
     if wallet_id and category_id and payment_method_id:
@@ -341,7 +379,13 @@ def run(args: argparse.Namespace) -> int:
         )
         transaction_id = data_id(transaction)
 
-    client.request("list transactions", "GET", args.transaction_url, "/api/transactions", token=access_token)
+    client.request(
+        "list transactions",
+        "GET",
+        args.transaction_url,
+        "/api/transactions",
+        token=access_token,
+    )
     client.request(
         "monthly summary",
         "GET",
@@ -461,7 +505,10 @@ def run(args: argparse.Namespace) -> int:
             args.transaction_url,
             f"/api/recurring-transactions/{recurring_id}",
             token=access_token,
-            json_body={"title": f"Smoke recurring updated {suffix}", "amount": "550.00"},
+            json_body={
+                "title": f"Smoke recurring updated {suffix}",
+                "amount": "550.00",
+            },
         )
 
     if attachment_id and transaction_id:
@@ -489,7 +536,13 @@ def run(args: argparse.Namespace) -> int:
             token=access_token,
         )
     if tag_id:
-        client.request("delete tag", "DELETE", args.transaction_url, f"/api/tags/{tag_id}", token=access_token)
+        client.request(
+            "delete tag",
+            "DELETE",
+            args.transaction_url,
+            f"/api/tags/{tag_id}",
+            token=access_token,
+        )
     if payment_method_id:
         client.request(
             "delete payment method",
@@ -499,9 +552,21 @@ def run(args: argparse.Namespace) -> int:
             token=access_token,
         )
     if category_id:
-        client.request("delete category", "DELETE", args.transaction_url, f"/api/categories/{category_id}", token=access_token)
+        client.request(
+            "delete category",
+            "DELETE",
+            args.transaction_url,
+            f"/api/categories/{category_id}",
+            token=access_token,
+        )
     if wallet_id:
-        client.request("delete wallet", "DELETE", args.transaction_url, f"/api/wallets/{wallet_id}", token=access_token)
+        client.request(
+            "delete wallet",
+            "DELETE",
+            args.transaction_url,
+            f"/api/wallets/{wallet_id}",
+            token=access_token,
+        )
 
     client.request("budget health", "GET", args.budget_url, "/health")
     client.request("budget hello", "GET", args.budget_url, "/hello", token=access_token)
@@ -530,20 +595,36 @@ def run(args: argparse.Namespace) -> int:
         args.budget_url,
         "/api/budgets",
         token=access_token,
-        query={"page": 1, "page_size": 20, "year": smoke_budget_year, "month": smoke_budget_month, "status": "ACTIVE"},
+        query={
+            "page": 1,
+            "page_size": 20,
+            "year": smoke_budget_year,
+            "month": smoke_budget_month,
+            "status": "ACTIVE",
+        },
     )
 
     budget_category_id = None
     alert_rule_id = None
     if budget_id:
-        client.request("get budget", "GET", args.budget_url, f"/api/budgets/{budget_id}", token=access_token)
+        client.request(
+            "get budget",
+            "GET",
+            args.budget_url,
+            f"/api/budgets/{budget_id}",
+            token=access_token,
+        )
         client.request(
             "update budget",
             "PATCH",
             args.budget_url,
             f"/api/budgets/{budget_id}",
             token=access_token,
-            json_body={"name": f"Smoke Budget Updated {suffix}", "total_budget_amount": 55000, "status": "ACTIVE"},
+            json_body={
+                "name": f"Smoke Budget Updated {suffix}",
+                "total_budget_amount": 55000,
+                "status": "ACTIVE",
+            },
         )
 
         budget_category = client.request(
@@ -588,7 +669,11 @@ def run(args: argparse.Namespace) -> int:
             args.budget_url,
             f"/api/budgets/{budget_id}/alert-rules",
             token=access_token,
-            json_body={"rule_type": "PERCENTAGE_USED", "threshold_percentage": 80, "is_enabled": True},
+            json_body={
+                "rule_type": "PERCENTAGE_USED",
+                "threshold_percentage": 80,
+                "is_enabled": True,
+            },
             expected={201},
         )
         alert_rule_id = data_id(alert_rule)
@@ -652,7 +737,13 @@ def run(args: argparse.Namespace) -> int:
                 f"/api/budgets/{budget_id}/categories/{budget_category_id}",
                 token=access_token,
             )
-        client.request("delete budget", "DELETE", args.budget_url, f"/api/budgets/{budget_id}", token=access_token)
+        client.request(
+            "delete budget",
+            "DELETE",
+            args.budget_url,
+            f"/api/budgets/{budget_id}",
+            token=access_token,
+        )
 
     report_year = smoke_budget_year
     report_month = smoke_budget_month
@@ -790,17 +881,35 @@ def run(args: argparse.Namespace) -> int:
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Call every app-defined API with hard-coded smoke-test values.")
+    parser = argparse.ArgumentParser(
+        description="Call every app-defined API with hard-coded smoke-test values."
+    )
     parser.add_argument("--email", required=True, help="User email for register/login.")
-    parser.add_argument("--password", required=True, help="User password for register/login. Must satisfy auth validation.")
-    parser.add_argument("--auth-url", default=AUTH_BASE_URL, help=f"Auth service URL. Default: {AUTH_BASE_URL}")
+    parser.add_argument(
+        "--password",
+        required=True,
+        help="User password for register/login. Must satisfy auth validation.",
+    )
+    parser.add_argument(
+        "--auth-url",
+        default=AUTH_BASE_URL,
+        help=f"Auth service URL. Default: {AUTH_BASE_URL}",
+    )
     parser.add_argument(
         "--transaction-url",
         default=TRANSACTION_BASE_URL,
         help=f"Transaction service URL. Default: {TRANSACTION_BASE_URL}",
     )
-    parser.add_argument("--budget-url", default=BUDGET_BASE_URL, help=f"Budget service URL. Default: {BUDGET_BASE_URL}")
-    parser.add_argument("--report-url", default=REPORT_BASE_URL, help=f"Report service URL. Default: {REPORT_BASE_URL}")
+    parser.add_argument(
+        "--budget-url",
+        default=BUDGET_BASE_URL,
+        help=f"Budget service URL. Default: {BUDGET_BASE_URL}",
+    )
+    parser.add_argument(
+        "--report-url",
+        default=REPORT_BASE_URL,
+        help=f"Report service URL. Default: {REPORT_BASE_URL}",
+    )
     return parser.parse_args(argv)
 
 

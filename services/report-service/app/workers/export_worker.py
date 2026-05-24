@@ -70,13 +70,17 @@ async def process_export_message(message: AbstractIncomingMessage, sessionmaker)
                 raise
 
 
-async def process_transaction_event(message: AbstractIncomingMessage, cache: DashboardCache) -> None:
+async def process_transaction_event(
+    message: AbstractIncomingMessage, cache: DashboardCache
+) -> None:
     async with message.process(requeue=False):
         payload = json.loads(message.body.decode("utf-8"))
         user_id = payload.get("user_id")
         if user_id:
             deleted = await cache.invalidate_user(user_id)
-            logger.info("invalidated dashboard cache", extra={"user_id": user_id, "deleted": deleted})
+            logger.info(
+                "invalidated dashboard cache", extra={"user_id": user_id, "deleted": deleted}
+            )
 
 
 async def main() -> None:
@@ -97,7 +101,9 @@ async def main() -> None:
         await export_queue.bind(exchange, routing_key="report.export.requested")
         await export_queue.consume(lambda message: process_export_message(message, sessionmaker))
 
-        transaction_queue = await channel.declare_queue(settings.report_transaction_events_queue, durable=True)
+        transaction_queue = await channel.declare_queue(
+            settings.report_transaction_events_queue, durable=True
+        )
         await transaction_queue.bind(exchange, routing_key="transaction.*")
         await transaction_queue.consume(lambda message: process_transaction_event(message, cache))
 

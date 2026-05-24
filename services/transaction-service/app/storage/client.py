@@ -31,7 +31,9 @@ class AttachmentStorage:
 
     async def check_bucket(self) -> None:
         try:
-            await anyio.to_thread.run_sync(partial(self._client.head_bucket, Bucket=self.bucket_name))
+            await anyio.to_thread.run_sync(
+                partial(self._client.head_bucket, Bucket=self.bucket_name)
+            )
         except (BotoCoreError, ClientError) as exc:
             raise StorageUnavailableError("attachment bucket unavailable") from exc
 

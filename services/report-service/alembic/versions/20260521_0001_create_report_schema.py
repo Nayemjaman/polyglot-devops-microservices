@@ -5,6 +5,7 @@ Revises:
 Create Date: 2026-05-21
 
 """
+
 from typing import Sequence, Union
 
 from alembic import op
@@ -35,14 +36,18 @@ def upgrade() -> None:
         sa.Column("wallet_breakdown", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
         sa.Column("budget_summary", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
         sa.Column("raw_data", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
-        sa.Column("generated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "generated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.Column(
             "id",
             postgresql.UUID(as_uuid=True),
             server_default=sa.text("gen_random_uuid()"),
             nullable=False,
         ),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.CheckConstraint("year >= 1900 AND year <= 9999", name="ck_report_snapshots_year"),
         sa.CheckConstraint(
             "month IS NULL OR (month >= 1 AND month <= 12)",
@@ -86,7 +91,9 @@ def upgrade() -> None:
             server_default=sa.text("gen_random_uuid()"),
             nullable=False,
         ),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.CheckConstraint(
             "status IN ('PENDING','PROCESSING','COMPLETED','FAILED')",
             name="ck_report_export_jobs_status",
@@ -95,7 +102,9 @@ def upgrade() -> None:
             "export_type IN ('PDF','CSV','XLSX','JSON')",
             name="ck_report_export_jobs_export_type",
         ),
-        sa.ForeignKeyConstraint(["report_snapshot_id"], ["report_snapshots.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(
+            ["report_snapshot_id"], ["report_snapshots.id"], ondelete="CASCADE"
+        ),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index("ix_report_export_jobs_user_id", "report_export_jobs", ["user_id"])
@@ -123,8 +132,12 @@ def upgrade() -> None:
             server_default=sa.text("gen_random_uuid()"),
             nullable=False,
         ),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.ForeignKeyConstraint(["report_snapshot_id"], ["report_snapshots.id"], ondelete="CASCADE"),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
+        sa.ForeignKeyConstraint(
+            ["report_snapshot_id"], ["report_snapshots.id"], ondelete="CASCADE"
+        ),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(
@@ -132,7 +145,9 @@ def upgrade() -> None:
         "dashboard_cache_snapshots",
         ["report_snapshot_id"],
     )
-    op.create_index("ix_dashboard_cache_snapshots_user_id", "dashboard_cache_snapshots", ["user_id"])
+    op.create_index(
+        "ix_dashboard_cache_snapshots_user_id", "dashboard_cache_snapshots", ["user_id"]
+    )
     op.create_index(
         "ix_dashboard_cache_snapshots_user_cache_date",
         "dashboard_cache_snapshots",
@@ -152,7 +167,9 @@ def upgrade() -> None:
             server_default=sa.text("gen_random_uuid()"),
             nullable=False,
         ),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.CheckConstraint("file_size >= 0", name="ck_report_files_file_size_non_negative"),
         sa.ForeignKeyConstraint(["export_job_id"], ["report_export_jobs.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
@@ -163,7 +180,9 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_index("ix_report_files_export_job_id", table_name="report_files")
     op.drop_table("report_files")
-    op.drop_index("ix_dashboard_cache_snapshots_user_cache_date", table_name="dashboard_cache_snapshots")
+    op.drop_index(
+        "ix_dashboard_cache_snapshots_user_cache_date", table_name="dashboard_cache_snapshots"
+    )
     op.drop_index("ix_dashboard_cache_snapshots_user_id", table_name="dashboard_cache_snapshots")
     op.drop_index(
         "ix_dashboard_cache_snapshots_report_snapshot_id",

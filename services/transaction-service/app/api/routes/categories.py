@@ -24,7 +24,9 @@ async def create_category(
         category = await category_service.create_category(session, user_id, payload)
     except ServiceError as exc:
         raise_service_error(exc)
-    return ApiResponse(message="Category created successfully", data=CategoryOut.model_validate(category))
+    return ApiResponse(
+        message="Category created successfully", data=CategoryOut.model_validate(category)
+    )
 
 
 @router.get("", response_model=PaginatedResponse)
@@ -38,7 +40,9 @@ async def list_categories(
     session: AsyncSession = Depends(get_db_session),
 ) -> PaginatedResponse:
     pagination = PaginationParams(page=page, page_size=page_size)
-    categories, total = await category_service.list_categories(session, user_id, pagination, type, is_active, search)
+    categories, total = await category_service.list_categories(
+        session, user_id, pagination, type, is_active, search
+    )
     return PaginatedResponse(
         message="Categories fetched successfully",
         data=[CategoryOut.model_validate(category) for category in categories],
@@ -56,7 +60,9 @@ async def get_category(
         category = await category_service.get_category(session, user_id, category_id)
     except ServiceError as exc:
         raise_service_error(exc)
-    return ApiResponse(message="Category fetched successfully", data=CategoryOut.model_validate(category))
+    return ApiResponse(
+        message="Category fetched successfully", data=CategoryOut.model_validate(category)
+    )
 
 
 @router.patch("/{category_id}", response_model=ApiResponse)
@@ -70,7 +76,9 @@ async def update_category(
         category = await category_service.update_category(session, user_id, category_id, payload)
     except ServiceError as exc:
         raise_service_error(exc)
-    return ApiResponse(message="Category updated successfully", data=CategoryOut.model_validate(category))
+    return ApiResponse(
+        message="Category updated successfully", data=CategoryOut.model_validate(category)
+    )
 
 
 @router.delete("/{category_id}", response_model=ApiResponse)

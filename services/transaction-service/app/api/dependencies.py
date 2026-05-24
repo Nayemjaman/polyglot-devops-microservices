@@ -33,7 +33,9 @@ async def get_current_user_id(
     authorization: str | None = Header(default=None),
 ) -> uuid.UUID:
     if not authorization:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="authentication required")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="authentication required"
+        )
 
     settings = request.app.state.settings
     http_client = request.app.state.http_client
@@ -47,6 +49,8 @@ async def get_current_user_id(
         ) from exc
 
     if user is None or user.id is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="authentication required")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="authentication required"
+        )
 
     return user.id

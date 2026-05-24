@@ -34,8 +34,13 @@ async def create_transaction(
         payload.model_dump(mode="json"),
     )
     if existing is not None:
-        transaction = await transaction_service.get_transaction(session, user_id, existing.resource_id)
-        return ApiResponse(message="Transaction fetched from idempotency record", data=transaction_to_out(transaction))
+        transaction = await transaction_service.get_transaction(
+            session, user_id, existing.resource_id
+        )
+        return ApiResponse(
+            message="Transaction fetched from idempotency record",
+            data=transaction_to_out(transaction),
+        )
 
     try:
         transaction = await transaction_service.create_transaction(session, user_id, payload)
@@ -159,7 +164,9 @@ async def get_transaction(
         transaction = await transaction_service.get_transaction(session, user_id, transaction_id)
     except ServiceError as exc:
         raise_service_error(exc)
-    return ApiResponse(message="Transaction fetched successfully", data=transaction_to_out(transaction))
+    return ApiResponse(
+        message="Transaction fetched successfully", data=transaction_to_out(transaction)
+    )
 
 
 @router.patch("/{transaction_id}", response_model=ApiResponse)
@@ -170,7 +177,9 @@ async def update_transaction(
     session: AsyncSession = Depends(get_db_session),
 ) -> ApiResponse:
     try:
-        transaction = await transaction_service.update_transaction(session, user_id, transaction_id, payload)
+        transaction = await transaction_service.update_transaction(
+            session, user_id, transaction_id, payload
+        )
     except ServiceError as exc:
         await session.rollback()
         raise_service_error(exc)
@@ -182,7 +191,9 @@ async def update_transaction(
         payload=transaction_event_payload("transaction.updated", user_id, transaction),
     )
     await session.commit()
-    return ApiResponse(message="Transaction updated successfully", data=transaction_to_out(transaction))
+    return ApiResponse(
+        message="Transaction updated successfully", data=transaction_to_out(transaction)
+    )
 
 
 @router.delete("/{transaction_id}", response_model=ApiResponse)

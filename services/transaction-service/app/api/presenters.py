@@ -43,7 +43,9 @@ def recurring_transaction_to_out(recurring: RecurringTransaction) -> RecurringTr
     return RecurringTransactionOut(
         id=recurring.id,
         user_id=recurring.user_id,
-        wallet=RefOut(id=recurring.wallet.id, name=recurring.wallet.name, type=recurring.wallet.type),
+        wallet=RefOut(
+            id=recurring.wallet.id, name=recurring.wallet.name, type=recurring.wallet.type
+        ),
         category=RefOut(
             id=recurring.category.id,
             name=recurring.category.name,

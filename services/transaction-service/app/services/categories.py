@@ -10,7 +10,9 @@ from app.services.common import clean_update, commit_refresh, get_owned, paginat
 from app.services.exceptions import ValidationServiceError
 
 
-async def create_category(session: AsyncSession, user_id: uuid.UUID, payload: CategoryCreate) -> Category:
+async def create_category(
+    session: AsyncSession, user_id: uuid.UUID, payload: CategoryCreate
+) -> Category:
     if payload.parent_category_id:
         await get_owned(session, Category, user_id, payload.parent_category_id)
     category = Category(
@@ -33,7 +35,9 @@ async def list_categories(
     is_active: bool | None = None,
     search: str | None = None,
 ) -> tuple[list[Category], int]:
-    statement = select(Category).where(Category.user_id == user_id).order_by(Category.created_at.desc())
+    statement = (
+        select(Category).where(Category.user_id == user_id).order_by(Category.created_at.desc())
+    )
     if category_type:
         statement = statement.where(Category.type == category_type)
     if is_active is not None:
@@ -43,7 +47,9 @@ async def list_categories(
     return await paginate(session, statement, pagination)
 
 
-async def get_category(session: AsyncSession, user_id: uuid.UUID, category_id: uuid.UUID) -> Category:
+async def get_category(
+    session: AsyncSession, user_id: uuid.UUID, category_id: uuid.UUID
+) -> Category:
     return await get_owned(session, Category, user_id, category_id)
 
 
@@ -64,7 +70,9 @@ async def update_category(
     return await commit_refresh(session, category)
 
 
-async def delete_category(session: AsyncSession, user_id: uuid.UUID, category_id: uuid.UUID) -> None:
+async def delete_category(
+    session: AsyncSession, user_id: uuid.UUID, category_id: uuid.UUID
+) -> None:
     category = await get_category(session, user_id, category_id)
     category.is_active = False
     await session.commit()

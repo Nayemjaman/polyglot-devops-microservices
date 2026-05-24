@@ -59,10 +59,14 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
     )
 
 
-async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+async def validation_exception_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
     errors: dict[str, list[str]] = {}
     for error in exc.errors():
-        field = ".".join(str(part) for part in error["loc"] if part not in {"body", "query", "path"})
+        field = ".".join(
+            str(part) for part in error["loc"] if part not in {"body", "query", "path"}
+        )
         errors.setdefault(field or "request", []).append(error["msg"])
     return JSONResponse(
         status_code=400,

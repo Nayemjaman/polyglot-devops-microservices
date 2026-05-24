@@ -7,7 +7,10 @@ from app.api.dependencies import get_current_user_id, get_db_session
 from app.api.errors import raise_service_error
 from app.api.presenters import recurring_transaction_to_out
 from app.schemas.pagination import PaginationParams
-from app.schemas.recurring_transactions import RecurringTransactionCreate, RecurringTransactionUpdate
+from app.schemas.recurring_transactions import (
+    RecurringTransactionCreate,
+    RecurringTransactionUpdate,
+)
 from app.schemas.responses import ApiResponse, PaginatedResponse
 from app.services import recurring_transactions as recurring_transaction_service
 from app.services.exceptions import ServiceError
@@ -22,7 +25,9 @@ async def create_recurring_transaction(
     session: AsyncSession = Depends(get_db_session),
 ) -> ApiResponse:
     try:
-        recurring = await recurring_transaction_service.create_recurring_transaction(session, user_id, payload)
+        recurring = await recurring_transaction_service.create_recurring_transaction(
+            session, user_id, payload
+        )
     except ServiceError as exc:
         raise_service_error(exc)
     return ApiResponse(
@@ -65,7 +70,9 @@ async def update_recurring_transaction(
     session: AsyncSession = Depends(get_db_session),
 ) -> ApiResponse:
     try:
-        recurring = await recurring_transaction_service.update_recurring_transaction(session, user_id, recurring_id, payload)
+        recurring = await recurring_transaction_service.update_recurring_transaction(
+            session, user_id, recurring_id, payload
+        )
     except ServiceError as exc:
         raise_service_error(exc)
     return ApiResponse(
@@ -81,7 +88,9 @@ async def delete_recurring_transaction(
     session: AsyncSession = Depends(get_db_session),
 ) -> ApiResponse:
     try:
-        await recurring_transaction_service.delete_recurring_transaction(session, user_id, recurring_id)
+        await recurring_transaction_service.delete_recurring_transaction(
+            session, user_id, recurring_id
+        )
     except ServiceError as exc:
         raise_service_error(exc)
     return ApiResponse(message="Recurring transaction deleted successfully", data=None)

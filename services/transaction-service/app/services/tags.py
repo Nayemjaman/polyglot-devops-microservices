@@ -21,7 +21,9 @@ async def create_tag(session: AsyncSession, user_id: uuid.UUID, name: str) -> Ta
 
 
 async def list_tags(session: AsyncSession, user_id: uuid.UUID) -> list[Tag]:
-    result = await session.scalars(select(Tag).where(Tag.user_id == user_id).order_by(Tag.name.asc()))
+    result = await session.scalars(
+        select(Tag).where(Tag.user_id == user_id).order_by(Tag.name.asc())
+    )
     return list(result)
 
 

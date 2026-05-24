@@ -6,7 +6,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from app.api.router import api_router
-from app.core.config import Settings, get_settings
+from app.core.config import get_settings
 from app.core.middleware import add_security_middleware
 from app.db.session import create_engine, create_sessionmaker
 from app.schemas.responses import ErrorResponse
@@ -43,10 +43,14 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
     )
 
 
-async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+async def validation_exception_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
     errors: dict[str, list[str]] = {}
     for error in exc.errors():
-        field = ".".join(str(part) for part in error["loc"] if part not in {"body", "query", "path"})
+        field = ".".join(
+            str(part) for part in error["loc"] if part not in {"body", "query", "path"}
+        )
         errors.setdefault(field or "request", []).append(error["msg"])
     return JSONResponse(
         status_code=400,

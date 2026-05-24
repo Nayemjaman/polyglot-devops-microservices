@@ -26,7 +26,9 @@ class UserProfileSerializer(serializers.Serializer):
     phone = serializers.CharField(max_length=32, required=False, allow_blank=True)
     avatar_url = serializers.URLField(max_length=500, required=False, allow_blank=True)
     country = serializers.CharField(max_length=100, required=False, allow_blank=True)
-    currency_code = serializers.CharField(max_length=3, required=False, allow_blank=True)
+    currency_code = serializers.CharField(
+        max_length=3, required=False, allow_blank=True
+    )
     timezone = serializers.CharField(max_length=64, required=False, allow_blank=True)
     date_of_birth = serializers.DateField(required=False, allow_null=True)
 

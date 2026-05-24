@@ -40,7 +40,9 @@ class RabbitMQPublisher:
         if self.connection:
             await self.connection.close()
 
-    async def publish(self, routing_key: str, payload: dict[str, Any], message_id: str | None = None) -> None:
+    async def publish(
+        self, routing_key: str, payload: dict[str, Any], message_id: str | None = None
+    ) -> None:
         if self.exchange is None:
             return
         await self.exchange.publish(
@@ -55,5 +57,7 @@ class RabbitMQPublisher:
 
 
 class NullPublisher:
-    async def publish(self, routing_key: str, payload: dict[str, Any], message_id: str | None = None) -> None:
+    async def publish(
+        self, routing_key: str, payload: dict[str, Any], message_id: str | None = None
+    ) -> None:
         logger.warning("RabbitMQ unavailable; skipped publish", extra={"routing_key": routing_key})

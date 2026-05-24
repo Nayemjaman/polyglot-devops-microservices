@@ -41,7 +41,9 @@ async def list_payment_methods(
     session: AsyncSession = Depends(get_db_session),
 ) -> PaginatedResponse:
     pagination = PaginationParams(page=page, page_size=page_size)
-    methods, total = await payment_method_service.list_payment_methods(session, user_id, pagination, type, is_active, search)
+    methods, total = await payment_method_service.list_payment_methods(
+        session, user_id, pagination, type, is_active, search
+    )
     return PaginatedResponse(
         message="Payment methods fetched successfully",
         data=[PaymentMethodOut.model_validate(method) for method in methods],
@@ -73,7 +75,9 @@ async def update_payment_method(
     session: AsyncSession = Depends(get_db_session),
 ) -> ApiResponse:
     try:
-        method = await payment_method_service.update_payment_method(session, user_id, method_id, payload)
+        method = await payment_method_service.update_payment_method(
+            session, user_id, method_id, payload
+        )
     except ServiceError as exc:
         raise_service_error(exc)
     return ApiResponse(

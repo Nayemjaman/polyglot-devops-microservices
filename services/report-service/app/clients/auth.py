@@ -34,7 +34,9 @@ async def get_authenticated_user(
     )
 
 
-async def _get_with_retry(client: httpx.AsyncClient, url: str, authorization: str) -> httpx.Response:
+async def _get_with_retry(
+    client: httpx.AsyncClient, url: str, authorization: str
+) -> httpx.Response:
     last_error: Exception | None = None
     for attempt in range(3):
         try:

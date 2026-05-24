@@ -14,15 +14,16 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+
 from django.contrib import admin
 from django.urls import include, path
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    path('', include('users.urls')),
+    path("admin/", admin.site.urls),
+    path("", include("users.urls")),
 ]
 
-handler400 = 'core.error_handlers.bad_request'
-handler403 = 'core.error_handlers.permission_denied'
-handler404 = 'core.error_handlers.page_not_found'
-handler500 = 'core.error_handlers.server_error'
+handler400 = "core.error_handlers.bad_request"
+handler403 = "core.error_handlers.permission_denied"
+handler404 = "core.error_handlers.page_not_found"
+handler500 = "core.error_handlers.server_error"

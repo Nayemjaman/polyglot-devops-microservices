@@ -58,7 +58,9 @@ class ReportService:
             "generated_at": snapshot.generated_at,
         }
 
-    async def income_vs_expense(self, user_id: uuid.UUID, year: int, month: int | None) -> dict[str, Any]:
+    async def income_vs_expense(
+        self, user_id: uuid.UUID, year: int, month: int | None
+    ) -> dict[str, Any]:
         snapshot = await self._create_snapshot(user_id, "INCOME_VS_EXPENSE", year, month)
         total = snapshot.total_income + snapshot.total_expense
         income_percentage = self._percentage(snapshot.total_income, total)
@@ -94,7 +96,9 @@ class ReportService:
             "month": month,
             "type": (transaction_type or "EXPENSE").upper(),
             "currency_code": snapshot.currency_code,
-            "total_amount": sum((Decimal(str(item.get("total_amount", 0))) for item in categories), Decimal("0")),
+            "total_amount": sum(
+                (Decimal(str(item.get("total_amount", 0))) for item in categories), Decimal("0")
+            ),
             "categories": categories,
         }
 
@@ -156,8 +160,14 @@ class ReportService:
                     for item in snapshot.category_breakdown.get("items", [])
                 ],
                 "budget_usage": [
-                    {"label": "Used", "value": snapshot.budget_summary.get("total_spent_amount", 0)},
-                    {"label": "Remaining", "value": snapshot.budget_summary.get("remaining_amount", 0)},
+                    {
+                        "label": "Used",
+                        "value": snapshot.budget_summary.get("total_spent_amount", 0),
+                    },
+                    {
+                        "label": "Remaining",
+                        "value": snapshot.budget_summary.get("remaining_amount", 0),
+                    },
                 ],
             },
             "recent_insights": [
@@ -177,9 +187,13 @@ class ReportService:
             "months": snapshot.raw_data.get("monthly_breakdown", self._empty_months()),
         }
 
-    async def create_export_job(self, user_id: uuid.UUID, payload: ExportRequest) -> ExportCreatedOut:
+    async def create_export_job(
+        self, user_id: uuid.UUID, payload: ExportRequest
+    ) -> ExportCreatedOut:
         self._validate_export_request(payload)
-        snapshot = await self._create_snapshot(user_id, payload.report_type, payload.year, payload.month)
+        snapshot = await self._create_snapshot(
+            user_id, payload.report_type, payload.year, payload.month
+        )
         now = datetime.now(timezone.utc)
         job = await self.repo.create_export_job(
             ReportExportJob(
@@ -217,9 +231,13 @@ class ReportService:
         export_type: str | None,
     ) -> tuple[list[ExportJobOut], int]:
         if status and status.upper() not in EXPORT_STATUSES:
-            raise ValidationServiceError("Validation failed", {"status": ["Invalid export job status"]})
+            raise ValidationServiceError(
+                "Validation failed", {"status": ["Invalid export job status"]}
+            )
         if export_type and export_type.upper() not in EXPORT_TYPES:
-            raise ValidationServiceError("Validation failed", {"export_type": ["Invalid export type"]})
+            raise ValidationServiceError(
+                "Validation failed", {"export_type": ["Invalid export type"]}
+            )
         jobs, total = await self.repo.list_export_jobs(user_id, pagination, status, export_type)
         return [self._job_out(job, include_user=False) for job in jobs], total
 

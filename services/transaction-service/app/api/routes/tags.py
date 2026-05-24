@@ -32,7 +32,9 @@ async def list_tags(
     session: AsyncSession = Depends(get_db_session),
 ) -> ApiResponse:
     tags = await tag_service.list_tags(session, user_id)
-    return ApiResponse(message="Tags fetched successfully", data=[TagOut.model_validate(tag) for tag in tags])
+    return ApiResponse(
+        message="Tags fetched successfully", data=[TagOut.model_validate(tag) for tag in tags]
+    )
 
 
 @router.delete("/{tag_id}", response_model=ApiResponse)

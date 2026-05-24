@@ -34,13 +34,17 @@ class ReportRepository:
     ) -> tuple[list[ReportExportJob], int]:
         query = (
             select(ReportExportJob)
-            .options(selectinload(ReportExportJob.report_snapshot), selectinload(ReportExportJob.files))
+            .options(
+                selectinload(ReportExportJob.report_snapshot), selectinload(ReportExportJob.files)
+            )
             .where(ReportExportJob.user_id == user_id)
         )
         query = self._apply_export_filters(query, status, export_type)
 
-        count_query = select(func.count()).select_from(ReportExportJob).where(
-            ReportExportJob.user_id == user_id
+        count_query = (
+            select(func.count())
+            .select_from(ReportExportJob)
+            .where(ReportExportJob.user_id == user_id)
         )
         count_query = self._apply_export_filters(count_query, status, export_type)
         total = int(await self.session.scalar(count_query) or 0)
@@ -55,7 +59,9 @@ class ReportRepository:
     async def get_export_job(self, user_id: uuid.UUID, job_id: uuid.UUID) -> ReportExportJob | None:
         result = await self.session.execute(
             select(ReportExportJob)
-            .options(selectinload(ReportExportJob.report_snapshot), selectinload(ReportExportJob.files))
+            .options(
+                selectinload(ReportExportJob.report_snapshot), selectinload(ReportExportJob.files)
+            )
             .where(ReportExportJob.id == job_id, ReportExportJob.user_id == user_id)
         )
         return result.scalar_one_or_none()
@@ -63,12 +69,16 @@ class ReportRepository:
     async def get_export_job_by_id(self, job_id: uuid.UUID) -> ReportExportJob | None:
         result = await self.session.execute(
             select(ReportExportJob)
-            .options(selectinload(ReportExportJob.report_snapshot), selectinload(ReportExportJob.files))
+            .options(
+                selectinload(ReportExportJob.report_snapshot), selectinload(ReportExportJob.files)
+            )
             .where(ReportExportJob.id == job_id)
         )
         return result.scalar_one_or_none()
 
-    async def mark_export_job_processing(self, job: ReportExportJob, started_at: datetime) -> ReportExportJob:
+    async def mark_export_job_processing(
+        self, job: ReportExportJob, started_at: datetime
+    ) -> ReportExportJob:
         job.status = "PROCESSING"
         job.started_at = started_at
         job.error_message = None
@@ -104,7 +114,9 @@ class ReportRepository:
     async def get_file(self, user_id: uuid.UUID, file_id: uuid.UUID) -> ReportFile | None:
         result = await self.session.execute(
             select(ReportFile)
-            .options(selectinload(ReportFile.export_job).selectinload(ReportExportJob.report_snapshot))
+            .options(
+                selectinload(ReportFile.export_job).selectinload(ReportExportJob.report_snapshot)
+            )
             .join(ReportExportJob)
             .where(ReportFile.id == file_id, ReportExportJob.user_id == user_id)
         )

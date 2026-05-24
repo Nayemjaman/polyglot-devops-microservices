@@ -15,10 +15,17 @@ class ReportSnapshot(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
     __tablename__ = "report_snapshots"
     __table_args__ = (
         CheckConstraint("year >= 1900 AND year <= 9999", name="ck_report_snapshots_year"),
-        CheckConstraint("month IS NULL OR (month >= 1 AND month <= 12)", name="ck_report_snapshots_month"),
+        CheckConstraint(
+            "month IS NULL OR (month >= 1 AND month <= 12)", name="ck_report_snapshots_month"
+        ),
         CheckConstraint("total_income >= 0", name="ck_report_snapshots_total_income_non_negative"),
-        CheckConstraint("total_expense >= 0", name="ck_report_snapshots_total_expense_non_negative"),
-        CheckConstraint("savings_rate >= -100 AND savings_rate <= 100", name="ck_report_snapshots_savings_rate_range"),
+        CheckConstraint(
+            "total_expense >= 0", name="ck_report_snapshots_total_expense_non_negative"
+        ),
+        CheckConstraint(
+            "savings_rate >= -100 AND savings_rate <= 100",
+            name="ck_report_snapshots_savings_rate_range",
+        ),
         Index("ix_report_snapshots_user_period", "user_id", "report_type", "year", "month"),
         Index("ix_report_snapshots_generated_at", "generated_at"),
     )
