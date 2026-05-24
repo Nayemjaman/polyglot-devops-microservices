@@ -1,0 +1,55 @@
+services:
+  frontend:
+    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/frontend:${IMAGE_TAG:-main}
+    build: null
+    pull_policy: always
+
+  auth-service:
+    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/auth-service:${IMAGE_TAG:-main}
+    build: null
+    pull_policy: always
+
+  auth-migrate:
+    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/auth-service:${IMAGE_TAG:-main}
+    build: null
+    pull_policy: always
+
+  budget-service:
+    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/budget-service:${IMAGE_TAG:-main}
+    build: null
+    pull_policy: always
+
+  budget-migrate:
+    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/budget-service:${IMAGE_TAG:-main}
+    build: null
+    pull_policy: always
+
+  report-service:
+    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/report-service:${IMAGE_TAG:-main}
+    build: null
+    pull_policy: always
+
+  report-worker:
+    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/report-service:${IMAGE_TAG:-main}
+    build: null
+    pull_policy: always
+
+  report-migrate:
+    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/report-service:${IMAGE_TAG:-main}
+    build: null
+    pull_policy: always
+
+  transaction-service:
+    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/transaction-service:${IMAGE_TAG:-main}
+    build: null
+    pull_policy: always
+
+  transaction-outbox-publisher:
+    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/transaction-service:${IMAGE_TAG:-main}
+    build: null
+    pull_policy: always
+
+  transaction-migrate:
+    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/transaction-service:${IMAGE_TAG:-main}
+    build: null
+    pull_policy: always

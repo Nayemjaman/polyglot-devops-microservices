@@ -10,6 +10,12 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      build_all:
+        description: Build and push every application image
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -264,7 +270,7 @@ jobs:
   detect-changes:
     name: Detect changed services
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.build_all)
     needs:
       - frontend-ci
       - python-ci
@@ -287,12 +293,6 @@ jobs:
         run: |
           set -euo pipefail
 
-          base="${{ github.event.before }}"
-          if [ "$base" = "0000000000000000000000000000000000000000" ]; then
-            base="$(git rev-list --max-parents=0 HEAD)"
-          fi
-
-          changed_files="$(git diff --name-only "$base" "${{ github.sha }}")"
           services='[]'
 
           add_service() {
@@ -300,6 +300,26 @@ jobs:
             local path="$2"
             services="$(jq -c --arg name "$name" --arg path "$path" '. + [{name: $name, path: $path}]' <<< "$services")"
           }
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.build_all }}" = "true" ]; then
+            add_service "frontend" "frontend"
+            add_service "auth-service" "services/auth-service"
+            add_service "transaction-service" "services/transaction-service"
+            add_service "budget-service" "services/budget-service"
+            add_service "report-service" "services/report-service"
+
+            matrix="$(jq -c --argjson include "$services" '{include: $include}' <<< '{}')"
+            echo 'has_changes=true' >> "$GITHUB_OUTPUT"
+            echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          base="${{ github.event.before }}"
+          if [ "$base" = "0000000000000000000000000000000000000000" ]; then
+            base="$(git rev-list --max-parents=0 HEAD)"
+          fi
+
+          changed_files="$(git diff --name-only "$base" "${{ github.sha }}")"
 
           if grep -qE '^(frontend/)' <<< "$changed_files"; then
             add_service "frontend" "frontend"

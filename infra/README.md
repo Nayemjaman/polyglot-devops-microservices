@@ -10,6 +10,47 @@ cp .env.example .env
 docker compose up -d
 ```
 
+## EC2 deployment with DockerHub images
+
+For a single EC2 deployment, keep `docker-compose.yml` as the base stack and add
+`docker-compose.ec2.yml` as the production override. The override replaces local
+`build:` contexts with DockerHub images for the application containers.
+
+First, push all application images from GitHub Actions:
+
+1. Open the `Polyglot Microservices CI/CD` workflow in GitHub Actions.
+2. Click `Run workflow`.
+3. Enable `build_all`.
+4. Run it from `main`.
+
+This pushes:
+
+- `DOCKERHUB_USER_NAME/frontend:main`
+- `DOCKERHUB_USER_NAME/auth-service:main`
+- `DOCKERHUB_USER_NAME/transaction-service:main`
+- `DOCKERHUB_USER_NAME/budget-service:main`
+- `DOCKERHUB_USER_NAME/report-service:main`
+
+Then on EC2:
+
+```bash
+cd infra
+cp .env.ec2.example .env
+# edit .env with real passwords, secrets, DockerHub username, and EC2 domain/IP
+docker compose -f docker-compose.yml -f docker-compose.ec2.yml pull
+docker compose -f docker-compose.yml -f docker-compose.ec2.yml up -d --no-build
+```
+
+For later deployments after CI pushes a changed image:
+
+```bash
+cd infra
+sh deploy-ec2.sh
+```
+
+Use `--no-build` on EC2. The override provides DockerHub image names, while the
+base compose file still contains local development `build:` entries.
+
 ## Public entrypoints
 
 Use the gateway instead of calling services directly:
