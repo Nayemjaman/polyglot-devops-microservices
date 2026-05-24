@@ -458,4 +458,3 @@ jobs:
             printf '%s\n' "${{ secrets.DOCKERHUB_ACCESS_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USER_NAME }}" --password-stdin
             IMAGE_SHA="${{ github.sha }}" sh deploy-changed-services.sh /tmp/polyglot-deploy-matrix.json
           EOF
-
