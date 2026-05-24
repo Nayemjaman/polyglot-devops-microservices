@@ -23,13 +23,17 @@ First, push all application images from GitHub Actions:
 3. Enable `build_all`.
 4. Run it from `main`.
 
-This pushes:
+This pushes all application images into one DockerHub repository with
+service-prefixed tags:
 
-- `DOCKERHUB_USER_NAME/frontend:main`
-- `DOCKERHUB_USER_NAME/auth-service:main`
-- `DOCKERHUB_USER_NAME/transaction-service:main`
-- `DOCKERHUB_USER_NAME/budget-service:main`
-- `DOCKERHUB_USER_NAME/report-service:main`
+- `DOCKERHUB_USER_NAME/polyglot-devops-microservices:frontend-main`
+- `DOCKERHUB_USER_NAME/polyglot-devops-microservices:auth-service-main`
+- `DOCKERHUB_USER_NAME/polyglot-devops-microservices:transaction-service-main`
+- `DOCKERHUB_USER_NAME/polyglot-devops-microservices:budget-service-main`
+- `DOCKERHUB_USER_NAME/polyglot-devops-microservices:report-service-main`
+
+Each image also gets a Git SHA tag, for example
+`DOCKERHUB_USER_NAME/polyglot-devops-microservices:frontend-<git-sha>`.
 
 Then on EC2:
 
