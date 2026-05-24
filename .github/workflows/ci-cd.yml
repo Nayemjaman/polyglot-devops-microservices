@@ -400,3 +400,49 @@ jobs:
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: "0"
+
+  deploy-production:
+    name: Deploy production
+    runs-on: ubuntu-latest
+    if: needs.detect-changes.outputs.has_changes == 'true' && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' && inputs.build_all)
+    needs:
+      - detect-changes
+      - docker-build-push
+    environment: production
+    steps:
+      - name: Prepare SSH
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.PROD_EC2_SSH_KEY }}" > ~/.ssh/prod_key
+          chmod 600 ~/.ssh/prod_key
+          ssh-keyscan -H "${{ secrets.PROD_EC2_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Write deployment matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' '${{ needs.detect-changes.outputs.matrix }}' > deploy-matrix.json
+
+      - name: Copy deployment matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          scp -i ~/.ssh/prod_key deploy-matrix.json \
+            "${{ secrets.PROD_EC2_USER }}@${{ secrets.PROD_EC2_HOST }}:/tmp/polyglot-deploy-matrix.json"
+
+      - name: Deploy changed services
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/prod_key "${{ secrets.PROD_EC2_USER }}@${{ secrets.PROD_EC2_HOST }}" <<'EOF'
+            set -eu
+            cd "${{ secrets.PROD_DEPLOY_PATH }}"
+            git fetch origin main
+            git checkout main
+            git pull --ff-only origin main
+            cd infra
+            printf '%s\n' "${{ secrets.DOCKERHUB_ACCESS_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USER_NAME }}" --password-stdin
+            IMAGE_SHA="${{ github.sha }}" sh deploy-changed-services.sh /tmp/polyglot-deploy-matrix.json
+          EOF

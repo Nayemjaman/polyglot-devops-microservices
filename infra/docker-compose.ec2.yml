@@ -1,55 +1,55 @@
 services:
   frontend:
-    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/polyglot-devops-microservices:frontend-${IMAGE_TAG:-main}
+    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/polyglot-devops-microservices:${FRONTEND_IMAGE_TAG:-frontend-main}
     build: null
     pull_policy: always
 
   auth-service:
-    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/polyglot-devops-microservices:auth-service-${IMAGE_TAG:-main}
+    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/polyglot-devops-microservices:${AUTH_SERVICE_IMAGE_TAG:-auth-service-main}
     build: null
     pull_policy: always
 
   auth-migrate:
-    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/polyglot-devops-microservices:auth-service-${IMAGE_TAG:-main}
+    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/polyglot-devops-microservices:${AUTH_SERVICE_IMAGE_TAG:-auth-service-main}
     build: null
     pull_policy: always
 
   budget-service:
-    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/polyglot-devops-microservices:budget-service-${IMAGE_TAG:-main}
+    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/polyglot-devops-microservices:${BUDGET_SERVICE_IMAGE_TAG:-budget-service-main}
     build: null
     pull_policy: always
 
   budget-migrate:
-    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/polyglot-devops-microservices:budget-service-${IMAGE_TAG:-main}
+    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/polyglot-devops-microservices:${BUDGET_SERVICE_IMAGE_TAG:-budget-service-main}
     build: null
     pull_policy: always
 
   report-service:
-    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/polyglot-devops-microservices:report-service-${IMAGE_TAG:-main}
+    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/polyglot-devops-microservices:${REPORT_SERVICE_IMAGE_TAG:-report-service-main}
     build: null
     pull_policy: always
 
   report-worker:
-    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/polyglot-devops-microservices:report-service-${IMAGE_TAG:-main}
+    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/polyglot-devops-microservices:${REPORT_SERVICE_IMAGE_TAG:-report-service-main}
     build: null
     pull_policy: always
 
   report-migrate:
-    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/polyglot-devops-microservices:report-service-${IMAGE_TAG:-main}
+    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/polyglot-devops-microservices:${REPORT_SERVICE_IMAGE_TAG:-report-service-main}
     build: null
     pull_policy: always
 
   transaction-service:
-    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/polyglot-devops-microservices:transaction-service-${IMAGE_TAG:-main}
+    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/polyglot-devops-microservices:${TRANSACTION_SERVICE_IMAGE_TAG:-transaction-service-main}
     build: null
     pull_policy: always
 
   transaction-outbox-publisher:
-    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/polyglot-devops-microservices:transaction-service-${IMAGE_TAG:-main}
+    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/polyglot-devops-microservices:${TRANSACTION_SERVICE_IMAGE_TAG:-transaction-service-main}
     build: null
     pull_policy: always
 
   transaction-migrate:
-    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/polyglot-devops-microservices:transaction-service-${IMAGE_TAG:-main}
+    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/polyglot-devops-microservices:${TRANSACTION_SERVICE_IMAGE_TAG:-transaction-service-main}
     build: null
     pull_policy: always

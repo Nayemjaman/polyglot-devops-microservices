@@ -47,6 +47,18 @@ docker compose -f docker-compose.yml -f docker-compose.ec2.yml up -d --no-build
 
 For later deployments after CI pushes a changed image:
 
+GitHub Actions deploys automatically after the `docker-build-push` job. The
+`production` environment approval gate must be approved first. The deploy job:
+
+- SSHs into EC2
+- pulls the updated image tag
+- runs the matching migration service when needed
+- restarts only the updated runtime service containers
+- waits for the service health check
+- restores the previous image tag and restarts the service if health fails
+
+You can still deploy the full current `.env` image set manually from EC2:
+
 ```bash
 cd infra
 sh deploy-ec2.sh
@@ -54,6 +66,10 @@ sh deploy-ec2.sh
 
 Use `--no-build` on EC2. The override provides DockerHub image names, while the
 base compose file still contains local development `build:` entries.
+
+With one EC2 instance and one container per service, deploys are minimal-downtime,
+not true zero-downtime. True zero-downtime requires at least two replicas behind
+a load balancer or a blue-green setup.
 
 ## Public entrypoints
 
