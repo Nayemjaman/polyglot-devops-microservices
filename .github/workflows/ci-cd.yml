@@ -54,10 +54,13 @@ jobs:
         include:
           - service: auth-service
             path: services/auth-service
+            lint_paths: core users manage.py
           - service: transaction-service
             path: services/transaction-service
+            lint_paths: app tests
           - service: report-service
             path: services/report-service
+            lint_paths: app tests
     services:
       postgres:
         image: postgres:16-alpine
@@ -119,11 +122,11 @@ jobs:
 
       - name: Lint
         run: |
-          flake8 app tests --count --select=E9,F63,F7,F82 --extend-ignore=F821 --show-source --statistics
+          flake8 ${{ matrix.lint_paths }} --count --select=E9,F63,F7,F82 --extend-ignore=F821 --show-source --statistics
           if [ -f pyproject.toml ]; then
-            ruff check app tests --ignore F821
+            ruff check ${{ matrix.lint_paths }} --ignore F821
           else
-            python -m compileall .
+            python -m compileall ${{ matrix.lint_paths }}
           fi
 
       - name: Test
@@ -168,7 +171,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Scan repository
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
@@ -251,7 +254,7 @@ jobs:
           cache-to: type=gha,scope=dry-run-${{ matrix.name }},mode=max
 
       - name: Scan dry-run image
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: local/${{ matrix.name }}:${{ github.sha }}
           severity: HIGH,CRITICAL
@@ -358,7 +361,7 @@ jobs:
           cache-to: type=gha,scope=${{ matrix.name }},mode=max
 
       - name: Scan pushed image
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ secrets.DOCKERHUB_USER_NAME }}/${{ matrix.name }}:${{ github.sha }}
           severity: HIGH,CRITICAL
