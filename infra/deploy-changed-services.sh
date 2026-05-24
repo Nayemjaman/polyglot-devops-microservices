@@ -56,16 +56,16 @@ run_migration() {
   service="$1"
   case "$service" in
     auth-service)
-      docker compose $COMPOSE_FILES run --rm --no-deps auth-migrate
+      docker compose $COMPOSE_FILES run --rm auth-migrate
       ;;
     budget-service)
-      docker compose $COMPOSE_FILES run --rm --no-deps budget-migrate
+      docker compose $COMPOSE_FILES run --rm budget-migrate
       ;;
     report-service)
-      docker compose $COMPOSE_FILES run --rm --no-deps report-migrate
+      docker compose $COMPOSE_FILES run --rm report-migrate
       ;;
     transaction-service)
-      docker compose $COMPOSE_FILES run --rm --no-deps transaction-migrate
+      docker compose $COMPOSE_FILES run --rm transaction-migrate
       ;;
     frontend)
       ;;
