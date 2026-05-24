@@ -187,5 +187,8 @@ for service in $services; do
   fi
 done
 
+docker compose $COMPOSE_FILES up -d --no-build gateway
+wait_for_health gateway 12 5
+
 docker compose $COMPOSE_FILES ps
 exit "$failed"
