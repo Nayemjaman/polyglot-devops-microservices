@@ -414,10 +414,22 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          test -n "${{ secrets.PROD_EC2_HOST }}" || { echo "PROD_EC2_HOST is empty"; exit 1; }
+          test -n "${{ secrets.PROD_EC2_USER }}" || { echo "PROD_EC2_USER is empty"; exit 1; }
+          test -n "${{ secrets.PROD_EC2_SSH_KEY }}" || { echo "PROD_EC2_SSH_KEY is empty"; exit 1; }
           mkdir -p ~/.ssh
           printf '%s\n' "${{ secrets.PROD_EC2_SSH_KEY }}" > ~/.ssh/prod_key
           chmod 600 ~/.ssh/prod_key
-          ssh-keyscan -H "${{ secrets.PROD_EC2_HOST }}" >> ~/.ssh/known_hosts
+          ssh-keygen -y -f ~/.ssh/prod_key >/dev/null || { echo "PROD_EC2_SSH_KEY is not a valid private key"; exit 1; }
+          ssh-keyscan -T 30 -H "${{ secrets.PROD_EC2_HOST }}" >> ~/.ssh/known_hosts || { echo "Cannot reach EC2 SSH host on port 22"; exit 1; }
+
+      - name: Test SSH connection
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh -vvv -o BatchMode=yes -o ConnectTimeout=30 -i ~/.ssh/prod_key \
+            "${{ secrets.PROD_EC2_USER }}@${{ secrets.PROD_EC2_HOST }}" \
+            'echo "ssh ok"; docker --version; docker compose version; test -d "${{ secrets.PROD_DEPLOY_PATH }}"'
 
       - name: Write deployment matrix
         shell: bash
