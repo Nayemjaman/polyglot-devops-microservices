@@ -56,7 +56,7 @@ class RegisterView(AsyncAPIView):
         if user is None:
             raise ValidationError({"detail": "Email or username already exists."})
         tokens = await issue_token_pair(user)
-
+        print(tokens)
         return response_with_refresh_cookie(
             {
                 "user": await serialize_user(user),
