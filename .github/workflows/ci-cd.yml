@@ -8,7 +8,8 @@ on:
       - prod
   push:
     branches:
-      - main
+      - staging
+      - prod
   workflow_dispatch:
     inputs:
       build_all:
@@ -25,9 +26,31 @@ permissions:
   contents: read
 
 jobs:
+  branch-policy:
+    name: Branch policy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Require prod commits to come from staging
+        if: github.event_name == 'push' && github.ref == 'refs/heads/prod'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin staging
+          if ! git merge-base --is-ancestor HEAD origin/staging; then
+            echo "Prod can only deploy commits that already exist in the staging branch."
+            echo "Merge or fast-forward staging first, then promote that staging commit to prod."
+            exit 1
+          fi
+
   frontend-ci:
     name: Frontend lint and build
     runs-on: ubuntu-latest
+    needs: branch-policy
     defaults:
       run:
         working-directory: frontend
@@ -54,6 +77,7 @@ jobs:
   python-ci:
     name: Python CI - ${{ matrix.service }}
     runs-on: ubuntu-latest
+    needs: branch-policy
     strategy:
       fail-fast: false
       matrix:
@@ -147,6 +171,7 @@ jobs:
   budget-ci:
     name: Budget service CI
     runs-on: ubuntu-latest
+    needs: branch-policy
     defaults:
       run:
         working-directory: services/budget-service
@@ -172,6 +197,7 @@ jobs:
   security-scan:
     name: Security scan
     runs-on: ubuntu-latest
+    needs: branch-policy
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -183,11 +209,12 @@ jobs:
           scan-ref: .
           severity: HIGH,CRITICAL
           ignore-unfixed: true
-          exit-code: "0"
+          exit-code: "1"
 
   pre-commit:
     name: Pre-commit hooks
     runs-on: ubuntu-latest
+    needs: branch-policy
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -203,6 +230,7 @@ jobs:
   sonar:
     name: SonarQube code quality
     runs-on: ubuntu-latest
+    needs: branch-policy
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
@@ -226,7 +254,7 @@ jobs:
   docker-dry-run:
     name: Docker dry run - ${{ matrix.name }}
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/staging')
     strategy:
       fail-fast: false
       matrix:
@@ -265,12 +293,12 @@ jobs:
           image-ref: local/${{ matrix.name }}:${{ github.sha }}
           severity: HIGH,CRITICAL
           ignore-unfixed: true
-          exit-code: "0"
+          exit-code: "1"
 
   detect-changes:
     name: Detect changed services
     runs-on: ubuntu-latest
-    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.build_all)
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/prod') || (github.event_name == 'workflow_dispatch' && inputs.build_all)
     needs:
       - frontend-ci
       - python-ci
@@ -366,7 +394,7 @@ jobs:
           push: true
           tags: |
             ${{ secrets.DOCKERHUB_USER_NAME }}/polyglot-devops-microservices:${{ matrix.name }}-${{ github.sha }}
-            ${{ secrets.DOCKERHUB_USER_NAME }}/polyglot-devops-microservices:${{ matrix.name }}-main
+            ${{ secrets.DOCKERHUB_USER_NAME }}/polyglot-devops-microservices:${{ matrix.name }}-prod
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,scope=${{ matrix.name }},mode=max
 
@@ -376,12 +404,12 @@ jobs:
           image-ref: ${{ secrets.DOCKERHUB_USER_NAME }}/polyglot-devops-microservices:${{ matrix.name }}-${{ github.sha }}
           severity: HIGH,CRITICAL
           ignore-unfixed: true
-          exit-code: "0"
+          exit-code: "1"
 
   deploy-production:
     name: Deploy production
     runs-on: ubuntu-latest
-    if: needs.detect-changes.outputs.has_changes == 'true' && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' && inputs.build_all)
+    if: needs.detect-changes.outputs.has_changes == 'true' && (github.event_name == 'push' && github.ref == 'refs/heads/prod' || github.event_name == 'workflow_dispatch' && inputs.build_all)
     needs:
       - detect-changes
       - docker-build-push
@@ -428,9 +456,9 @@ jobs:
           ssh -i ~/.ssh/prod_key "${{ secrets.PROD_EC2_USER }}@${{ secrets.PROD_EC2_HOST }}" <<'EOF'
             set -eu
             cd "${{ secrets.PROD_DEPLOY_PATH }}"
-            git fetch origin main
-            git checkout main
-            git pull --ff-only origin main
+            git fetch origin prod
+            git checkout prod
+            git pull --ff-only origin prod
             cd infra
             printf '%s\n' "${{ secrets.DOCKERHUB_ACCESS_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USER_NAME }}" --password-stdin
             IMAGE_SHA="${{ github.sha }}" sh deploy-changed-services.sh /tmp/polyglot-deploy-matrix.json

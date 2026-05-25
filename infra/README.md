@@ -21,16 +21,16 @@ First, push all application images from GitHub Actions:
 1. Open the `Polyglot Microservices CI/CD` workflow in GitHub Actions.
 2. Click `Run workflow`.
 3. Enable `build_all`.
-4. Run it from `main`.
+4. Run it from `prod`.
 
 This pushes all application images into one DockerHub repository with
 service-prefixed tags:
 
-- `DOCKERHUB_USER_NAME/polyglot-devops-microservices:frontend-main`
-- `DOCKERHUB_USER_NAME/polyglot-devops-microservices:auth-service-main`
-- `DOCKERHUB_USER_NAME/polyglot-devops-microservices:transaction-service-main`
-- `DOCKERHUB_USER_NAME/polyglot-devops-microservices:budget-service-main`
-- `DOCKERHUB_USER_NAME/polyglot-devops-microservices:report-service-main`
+- `DOCKERHUB_USER_NAME/polyglot-devops-microservices:frontend-prod`
+- `DOCKERHUB_USER_NAME/polyglot-devops-microservices:auth-service-prod`
+- `DOCKERHUB_USER_NAME/polyglot-devops-microservices:transaction-service-prod`
+- `DOCKERHUB_USER_NAME/polyglot-devops-microservices:budget-service-prod`
+- `DOCKERHUB_USER_NAME/polyglot-devops-microservices:report-service-prod`
 
 Each image also gets a Git SHA tag, for example
 `DOCKERHUB_USER_NAME/polyglot-devops-microservices:frontend-<git-sha>`.
@@ -47,7 +47,8 @@ docker compose -f docker-compose.yml -f docker-compose.ec2.yml up -d --no-build
 
 For later deployments after CI pushes a changed image:
 
-GitHub Actions deploys automatically after the `docker-build-push` job. The
+GitHub Actions deploys automatically after a push to the `prod` branch and a
+successful `docker-build-push` job. The
 `production` environment approval gate must be approved first. The deploy job:
 
 - SSHs into EC2
@@ -56,6 +57,10 @@ GitHub Actions deploys automatically after the `docker-build-push` job. The
 - restarts only the updated runtime service containers
 - waits for the service health check
 - restores the previous image tag and restarts the service if health fails
+
+The workflow blocks `prod` pushes unless the pushed commit already exists in
+`staging`. Promote by fast-forwarding or pushing a known-good staging commit to
+`prod`; do not commit directly on `prod`.
 
 You can still deploy the full current `.env` image set manually from EC2:
 
