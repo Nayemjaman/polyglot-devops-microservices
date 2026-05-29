@@ -295,8 +295,8 @@ services:
       APP_ENV: ${BUDGET_APP_ENV:-production}
       HTTP_ADDR: :8001
       BUDGET_GRPC_ADDR: :50051
-      AUTH_SERVICE_URL: http://auth-service:8000
-      TRANSACTION_GRPC_ADDR: transaction-service:50052
+      AUTH_SERVICE_URL: http://${AUTH_SERVICE_UPSTREAM:-auth-service}:8000
+      TRANSACTION_GRPC_ADDR: ${TRANSACTION_SERVICE_UPSTREAM:-transaction-service}:50052
       DATABASE_URL: postgres://${BUDGET_DB_USER:-budget_service_user}:${BUDGET_DB_PASSWORD:?BUDGET_DB_PASSWORD is required}@budget-pgbouncer:6432/${BUDGET_DB_NAME:-budget_service_db}?sslmode=disable
       CORS_ALLOWED_ORIGINS: ${BUDGET_CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
       RUN_MIGRATIONS: ${BUDGET_RUN_MIGRATIONS:-false}
@@ -397,7 +397,7 @@ services:
       APP_ENV: ${REPORT_APP_ENV:-production}
       HOST: 0.0.0.0
       PORT: 8003
-      AUTH_SERVICE_URL: http://auth-service:8000
+      AUTH_SERVICE_URL: http://${AUTH_SERVICE_UPSTREAM:-auth-service}:8000
       HTTP_TIMEOUT_SECONDS: ${REPORT_HTTP_TIMEOUT_SECONDS:-5}
       DATABASE_URL: postgresql+asyncpg://${REPORT_DB_USER:-report_service_user}:${REPORT_DB_PASSWORD:?REPORT_DB_PASSWORD is required}@report-pgbouncer:6432/${REPORT_DB_NAME:-report_service_db}?prepared_statement_cache_size=0
       CORS_ALLOWED_ORIGINS: ${REPORT_CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
@@ -442,7 +442,7 @@ services:
       APP_ENV: ${REPORT_APP_ENV:-production}
       HOST: 0.0.0.0
       PORT: 8003
-      AUTH_SERVICE_URL: http://auth-service:8000
+      AUTH_SERVICE_URL: http://${AUTH_SERVICE_UPSTREAM:-auth-service}:8000
       HTTP_TIMEOUT_SECONDS: ${REPORT_HTTP_TIMEOUT_SECONDS:-5}
       DATABASE_URL: postgresql+asyncpg://${REPORT_DB_USER:-report_service_user}:${REPORT_DB_PASSWORD:?REPORT_DB_PASSWORD is required}@report-pgbouncer:6432/${REPORT_DB_NAME:-report_service_db}?prepared_statement_cache_size=0
       CORS_ALLOWED_ORIGINS: ${REPORT_CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
@@ -477,7 +477,7 @@ services:
       APP_ENV: ${REPORT_APP_ENV:-production}
       HOST: 0.0.0.0
       PORT: 8003
-      AUTH_SERVICE_URL: http://auth-service:8000
+      AUTH_SERVICE_URL: http://${AUTH_SERVICE_UPSTREAM:-auth-service}:8000
       HTTP_TIMEOUT_SECONDS: ${REPORT_HTTP_TIMEOUT_SECONDS:-5}
       DATABASE_URL: postgresql+asyncpg://${REPORT_DB_USER:-report_service_user}:${REPORT_DB_PASSWORD:?REPORT_DB_PASSWORD is required}@report-pgbouncer:6432/${REPORT_DB_NAME:-report_service_db}?prepared_statement_cache_size=0
       CORS_ALLOWED_ORIGINS: ${REPORT_CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
@@ -591,7 +591,7 @@ services:
       APP_ENV: ${TRANSACTION_APP_ENV:-production}
       HOST: 0.0.0.0
       PORT: 8002
-      AUTH_SERVICE_URL: http://auth-service:8000
+      AUTH_SERVICE_URL: http://${AUTH_SERVICE_UPSTREAM:-auth-service}:8000
       HTTP_TIMEOUT_SECONDS: ${TRANSACTION_HTTP_TIMEOUT_SECONDS:-5}
       DATABASE_URL: postgresql+asyncpg://${TRANSACTION_DB_USER:-transaction_service_user}:${TRANSACTION_DB_PASSWORD:?TRANSACTION_DB_PASSWORD is required}@transaction-pgbouncer:6432/${TRANSACTION_DB_NAME:-transaction_service_db}?prepared_statement_cache_size=0
       CORS_ALLOWED_ORIGINS: ${TRANSACTION_CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
@@ -635,7 +635,7 @@ services:
       APP_ENV: ${TRANSACTION_APP_ENV:-production}
       HOST: 0.0.0.0
       PORT: 8002
-      AUTH_SERVICE_URL: http://auth-service:8000
+      AUTH_SERVICE_URL: http://${AUTH_SERVICE_UPSTREAM:-auth-service}:8000
       HTTP_TIMEOUT_SECONDS: ${TRANSACTION_HTTP_TIMEOUT_SECONDS:-5}
       DATABASE_URL: postgresql+asyncpg://${TRANSACTION_DB_USER:-transaction_service_user}:${TRANSACTION_DB_PASSWORD:?TRANSACTION_DB_PASSWORD is required}@transaction-pgbouncer:6432/${TRANSACTION_DB_NAME:-transaction_service_db}?prepared_statement_cache_size=0
       CORS_ALLOWED_ORIGINS: ${TRANSACTION_CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
@@ -676,7 +676,7 @@ services:
       APP_ENV: ${TRANSACTION_APP_ENV:-production}
       HOST: 0.0.0.0
       PORT: 8002
-      AUTH_SERVICE_URL: http://auth-service:8000
+      AUTH_SERVICE_URL: http://${AUTH_SERVICE_UPSTREAM:-auth-service}:8000
       HTTP_TIMEOUT_SECONDS: ${TRANSACTION_HTTP_TIMEOUT_SECONDS:-5}
       DATABASE_URL: postgresql+asyncpg://${TRANSACTION_DB_USER:-transaction_service_user}:${TRANSACTION_DB_PASSWORD:?TRANSACTION_DB_PASSWORD is required}@transaction-pgbouncer:6432/${TRANSACTION_DB_NAME:-transaction_service_db}?prepared_statement_cache_size=0
       CORS_ALLOWED_ORIGINS: ${TRANSACTION_CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}

@@ -363,6 +363,9 @@ jobs:
                   ;;
                 services/auth-service/*)
                   add_if_missing "auth-service" "services/auth-service"
+                  add_if_missing "transaction-service" "services/transaction-service"
+                  add_if_missing "budget-service" "services/budget-service"
+                  add_if_missing "report-service" "services/report-service"
                   ;;
                 services/transaction-service/*)
                   add_if_missing "transaction-service" "services/transaction-service"
