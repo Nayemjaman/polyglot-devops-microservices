@@ -30,7 +30,7 @@ REFRESH_COOKIE_NAME = "polyglot_refresh"
 def refresh_cookie_settings():
     return {
         "httponly": True,
-        "secure": not settings.DEBUG,
+        "secure": settings.REFRESH_COOKIE_SECURE,
         "samesite": "Lax",
         "path": "/",
         "max_age": int(settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"].total_seconds()),

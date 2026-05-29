@@ -45,6 +45,12 @@ docker compose -f docker-compose.yml -f docker-compose.ec2.yml pull
 docker compose -f docker-compose.yml -f docker-compose.ec2.yml up -d --no-build
 ```
 
+If you are testing production mode over plain HTTP on an EC2 IP address, keep
+`AUTH_REFRESH_COOKIE_SECURE=false` in `.env`. Browsers do not send `Secure`
+cookies over HTTP, so token refresh will fail with `POST /auth/refresh 400` and
+protected APIs will return `401`. For real production HTTPS, set
+`AUTH_REFRESH_COOKIE_SECURE=true`.
+
 For later deployments after CI pushes a changed image:
 
 GitHub Actions deploys automatically after a push to the `prod` branch and a
