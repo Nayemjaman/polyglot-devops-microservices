@@ -12,7 +12,7 @@ import (
 )
 
 type metricStore struct {
-	mu        sync.Mutex
+	mu       sync.Mutex
 	requests map[string]int64
 	latency  map[string]durationSummary
 }
