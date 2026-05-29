@@ -58,7 +58,7 @@ func rateLimitMiddleware(cfg config.Config) gin.HandlerFunc {
 	buckets := map[string]*rateBucket{}
 
 	return func(ctx *gin.Context) {
-		if ctx.Request.URL.Path == "/health" {
+		if ctx.Request.URL.Path == "/health" || ctx.Request.URL.Path == "/metrics" {
 			ctx.Next()
 			return
 		}

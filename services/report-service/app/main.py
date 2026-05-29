@@ -5,6 +5,7 @@ from redis.asyncio import Redis
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from fastapi.responses import PlainTextResponse
 
 from app.api.router import api_router
 from app.cache import DashboardCache, NullDashboardCache
@@ -12,6 +13,7 @@ from app.core.config import get_settings
 from app.core.middleware import add_security_middleware
 from app.db.session import create_engine, create_sessionmaker
 from app.messaging import NullPublisher, RabbitMQPublisher
+from app.metrics import MetricsMiddleware, render_metrics
 from app.schemas.responses import ErrorResponse
 
 
@@ -86,6 +88,12 @@ def create_app() -> FastAPI:
     app.add_exception_handler(HTTPException, http_exception_handler)
     app.add_exception_handler(RequestValidationError, validation_exception_handler)
     add_security_middleware(app, settings)
+    app.add_middleware(MetricsMiddleware)
+
+    @app.get("/metrics", include_in_schema=False)
+    async def metrics() -> PlainTextResponse:
+        return PlainTextResponse(render_metrics(settings.app_name))
+
     app.include_router(api_router)
     return app
 

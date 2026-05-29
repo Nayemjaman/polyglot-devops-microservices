@@ -62,6 +62,10 @@ services:
     container_name: rabbitmq
     restart: unless-stopped
     logging: *default-logging
+    command:
+      - sh
+      - -c
+      - rabbitmq-plugins enable --offline rabbitmq_prometheus && rabbitmq-server
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-app}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-app_password}
@@ -537,6 +541,7 @@ services:
     environment:
       MINIO_ROOT_USER: ${TRANSACTION_STORAGE_ACCESS_KEY:?TRANSACTION_STORAGE_ACCESS_KEY is required}
       MINIO_ROOT_PASSWORD: ${TRANSACTION_STORAGE_SECRET_KEY:?TRANSACTION_STORAGE_SECRET_KEY is required}
+      MINIO_PROMETHEUS_AUTH_TYPE: public
     volumes:
       - transaction-minio-data:/data
     expose:

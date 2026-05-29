@@ -44,7 +44,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self.hits: dict[str, deque[float]] = defaultdict(deque)
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        if request.url.path.startswith("/health"):
+        if request.url.path.startswith(("/health", "/metrics")):
             return await call_next(request)
 
         client = request.client.host if request.client else "unknown"

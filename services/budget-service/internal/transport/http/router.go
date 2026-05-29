@@ -26,9 +26,11 @@ func NewRouter(cfg config.Config, logger *slog.Logger, db *gorm.DB) *gin.Engine 
 	router.Use(requestIDMiddleware())
 	router.Use(corsMiddleware(cfg.CORSAllowedOrigins))
 	router.Use(rateLimitMiddleware(cfg))
+	router.Use(metricsMiddleware())
 	router.Use(requestLogger(logger))
 
 	router.GET("/health", healthHandler)
+	router.GET("/metrics", metricsHandler)
 	authClient := auth.NewClient(cfg.AuthServiceURL)
 	protected := router.Group("")
 	protected.Use(authMiddleware(authClient, logger))

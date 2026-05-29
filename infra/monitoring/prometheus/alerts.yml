@@ -1,0 +1,94 @@
+groups:
+  - name: platform-health
+    rules:
+      - alert: InfrastructureTargetDown
+        expr: up{job!~"app-.*"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Prometheus target is down"
+          description: "{{ $labels.job }} target {{ $labels.instance }} has been unreachable for more than 2 minutes."
+
+      - alert: ApplicationServiceUnavailable
+        expr: sum by (service) (up{job=~"app-.*"}) == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Application service has no reachable instance"
+          description: "No Prometheus target is reachable for {{ $labels.service }}."
+
+      - alert: Application5xxResponses
+        expr: sum by (service) (rate(app_http_requests_total{status=~"5.."}[5m])) > 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Application is returning 5xx responses"
+          description: "{{ $labels.service }} has returned HTTP 5xx responses during the last 5 minutes."
+
+      - alert: ApplicationHighAverageLatency
+        expr: sum by (service) (rate(app_http_request_duration_seconds_sum[5m])) / sum by (service) (rate(app_http_request_duration_seconds_count[5m])) > 1.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Application latency is high"
+          description: "{{ $labels.service }} average request latency is above 1.5s for 5 minutes."
+
+      - alert: ApplicationUnauthorizedSpike
+        expr: sum by (service) (rate(app_http_requests_total{status="401"}[5m])) > 1
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Unauthorized responses increased"
+          description: "{{ $labels.service }} is returning more than 1 unauthorized response per second."
+
+  - name: infrastructure-health
+    rules:
+      - alert: HostDiskSpaceLow
+        expr: (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"}) < 0.15
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host disk space is low"
+          description: "{{ $labels.instance }} has less than 15% disk space available on {{ $labels.mountpoint }}."
+
+      - alert: HostCpuHigh
+        expr: 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host CPU usage is high"
+          description: "{{ $labels.instance }} CPU usage has been above 85% for 10 minutes."
+
+      - alert: RabbitMqQueueBacklog
+        expr: sum(rabbitmq_queue_messages_ready) > 100
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "RabbitMQ queue backlog is growing"
+          description: "RabbitMQ has more than 100 ready messages for 5 minutes."
+
+      - alert: RedisExporterDown
+        expr: up{job="redis"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis exporter is down"
+          description: "Prometheus cannot scrape Redis metrics."
+
+      - alert: DatabaseExporterDown
+        expr: up{job=~"postgres|pgbouncer"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Database exporter is down"
+          description: "{{ $labels.job }} exporter for {{ $labels.service }} is unreachable."

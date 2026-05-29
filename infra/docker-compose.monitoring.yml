@@ -1,0 +1,180 @@
+services:
+  prometheus:
+    image: prom/prometheus:v3.0.1
+    container_name: prometheus
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    networks:
+      - backend
+    depends_on:
+      - cadvisor
+      - node-exporter
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    networks:
+      - backend
+    depends_on:
+      - prometheus
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: cadvisor
+    restart: unless-stopped
+    privileged: true
+    command:
+      - --docker_only=true
+      - --housekeeping_interval=15s
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    networks:
+      - backend
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: node-exporter
+    restart: unless-stopped
+    command:
+      - --path.rootfs=/host
+    pid: host
+    volumes:
+      - /:/host:ro
+    networks:
+      - backend
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.67.0
+    container_name: redis-exporter
+    restart: unless-stopped
+    environment:
+      REDIS_ADDR: redis://redis:6379
+    networks:
+      - backend
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  auth-postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.16.0
+    container_name: auth-postgres-exporter
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: postgresql://${AUTH_DB_USER:-auth_service_user}:${AUTH_DB_PASSWORD:?AUTH_DB_PASSWORD is required}@auth-postgres:5432/${AUTH_DB_NAME:-auth_service_db}?sslmode=disable
+    networks:
+      - backend
+    depends_on:
+      auth-postgres:
+        condition: service_healthy
+
+  budget-postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.16.0
+    container_name: budget-postgres-exporter
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: postgresql://${BUDGET_DB_USER:-budget_service_user}:${BUDGET_DB_PASSWORD:?BUDGET_DB_PASSWORD is required}@budget-postgres:5432/${BUDGET_DB_NAME:-budget_service_db}?sslmode=disable
+    networks:
+      - backend
+    depends_on:
+      budget-postgres:
+        condition: service_healthy
+
+  report-postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.16.0
+    container_name: report-postgres-exporter
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: postgresql://${REPORT_DB_USER:-report_service_user}:${REPORT_DB_PASSWORD:?REPORT_DB_PASSWORD is required}@report-postgres:5432/${REPORT_DB_NAME:-report_service_db}?sslmode=disable
+    networks:
+      - backend
+    depends_on:
+      report-postgres:
+        condition: service_healthy
+
+  transaction-postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.16.0
+    container_name: transaction-postgres-exporter
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: postgresql://${TRANSACTION_DB_USER:-transaction_service_user}:${TRANSACTION_DB_PASSWORD:?TRANSACTION_DB_PASSWORD is required}@transaction-postgres:5432/${TRANSACTION_DB_NAME:-transaction_service_db}?sslmode=disable
+    networks:
+      - backend
+    depends_on:
+      transaction-postgres:
+        condition: service_healthy
+
+  auth-pgbouncer-exporter:
+    image: prometheuscommunity/pgbouncer-exporter:v0.10.2
+    container_name: auth-pgbouncer-exporter
+    restart: unless-stopped
+    command:
+      - --pgBouncer.connectionString=postgres://${AUTH_DB_USER:-auth_service_user}:${AUTH_DB_PASSWORD:?AUTH_DB_PASSWORD is required}@auth-pgbouncer:6432/pgbouncer?sslmode=disable
+    networks:
+      - backend
+    depends_on:
+      auth-pgbouncer:
+        condition: service_healthy
+
+  budget-pgbouncer-exporter:
+    image: prometheuscommunity/pgbouncer-exporter:v0.10.2
+    container_name: budget-pgbouncer-exporter
+    restart: unless-stopped
+    command:
+      - --pgBouncer.connectionString=postgres://${BUDGET_DB_USER:-budget_service_user}:${BUDGET_DB_PASSWORD:?BUDGET_DB_PASSWORD is required}@budget-pgbouncer:6432/pgbouncer?sslmode=disable
+    networks:
+      - backend
+    depends_on:
+      budget-pgbouncer:
+        condition: service_healthy
+
+  report-pgbouncer-exporter:
+    image: prometheuscommunity/pgbouncer-exporter:v0.10.2
+    container_name: report-pgbouncer-exporter
+    restart: unless-stopped
+    command:
+      - --pgBouncer.connectionString=postgres://${REPORT_DB_USER:-report_service_user}:${REPORT_DB_PASSWORD:?REPORT_DB_PASSWORD is required}@report-pgbouncer:6432/pgbouncer?sslmode=disable
+    networks:
+      - backend
+    depends_on:
+      report-pgbouncer:
+        condition: service_healthy
+
+  transaction-pgbouncer-exporter:
+    image: prometheuscommunity/pgbouncer-exporter:v0.10.2
+    container_name: transaction-pgbouncer-exporter
+    restart: unless-stopped
+    command:
+      - --pgBouncer.connectionString=postgres://${TRANSACTION_DB_USER:-transaction_service_user}:${TRANSACTION_DB_PASSWORD:?TRANSACTION_DB_PASSWORD is required}@transaction-pgbouncer:6432/pgbouncer?sslmode=disable
+    networks:
+      - backend
+    depends_on:
+      transaction-pgbouncer:
+        condition: service_healthy
+
+volumes:
+  prometheus-data:
+  grafana-data:

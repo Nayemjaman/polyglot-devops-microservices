@@ -123,6 +123,53 @@ With one EC2 instance and one container per service, deploys are minimal-downtim
 not true zero-downtime. True zero-downtime requires at least two replicas behind
 a load balancer or a blue-green setup.
 
+## Monitoring
+
+Prometheus and Grafana run as an optional Compose override so the application
+stack can still start without observability services during lightweight local
+work.
+
+Start local monitoring:
+
+```bash
+cd infra
+docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
+```
+
+Start EC2 monitoring with DockerHub images and blue-green routing:
+
+```bash
+cd infra
+docker compose \
+  -f docker-compose.yml \
+  -f docker-compose.ec2.yml \
+  -f docker-compose.blue-green.yml \
+  -f docker-compose.monitoring.yml \
+  up -d --no-build
+```
+
+Default monitoring URLs:
+
+| Tool | URL |
+| --- | --- |
+| Prometheus | `http://127.0.0.1:9090` |
+| Grafana | `http://127.0.0.1:3001` |
+
+Set `PROMETHEUS_PORT`, `GRAFANA_PORT`, `GRAFANA_ADMIN_USER`, and
+`GRAFANA_ADMIN_PASSWORD` in `.env` before exposing Grafana outside localhost.
+
+Prometheus scrapes:
+
+| Layer | Targets |
+| --- | --- |
+| Gateway | Caddy admin metrics on `gateway:2019` |
+| Applications | Auth, Budget, Report, and Transaction `/metrics` endpoints |
+| Data | PostgreSQL exporters, PgBouncer exporters, Redis exporter, RabbitMQ metrics, MinIO metrics |
+| Host and containers | Node Exporter and cAdvisor |
+
+Grafana is provisioned automatically with a Prometheus datasource and two
+dashboards: `Polyglot Platform Overview` and `Polyglot Data Layer`.
+
 ## Public entrypoints
 
 Use the gateway instead of calling services directly:
