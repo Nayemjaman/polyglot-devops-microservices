@@ -23,7 +23,10 @@ class MetricsMiddleware:
         response = self.get_response(request)
         elapsed_seconds = time.monotonic() - started_at
 
-        route = getattr(getattr(request, "resolver_match", None), "route", None) or request.path
+        route = (
+            getattr(getattr(request, "resolver_match", None), "route", None)
+            or request.path
+        )
         key = (request.method, route, str(response.status_code))
         with LOCK:
             REQUESTS[key] += 1
@@ -61,6 +64,10 @@ def metrics_view(_request):
                 route,
             )
             lines.append(f"app_http_request_duration_seconds_count{{{labels}}} {count}")
-            lines.append(f"app_http_request_duration_seconds_sum{{{labels}}} {total:.6f}")
+            lines.append(
+                f"app_http_request_duration_seconds_sum{{{labels}}} {total:.6f}"
+            )
 
-    return HttpResponse("\n".join(lines) + "\n", content_type="text/plain; version=0.0.4")
+    return HttpResponse(
+        "\n".join(lines) + "\n", content_type="text/plain; version=0.0.4"
+    )
