@@ -155,8 +155,11 @@ Default monitoring URLs:
 | Prometheus | `http://127.0.0.1:9090` |
 | Grafana | `http://127.0.0.1:3001` |
 
-Set `PROMETHEUS_PORT`, `GRAFANA_PORT`, `GRAFANA_ADMIN_USER`, and
+Set `PROMETHEUS_PORT`, `PROMETHEUS_RETENTION_TIME`,
+`PROMETHEUS_RETENTION_SIZE`, `GRAFANA_PORT`, `GRAFANA_ADMIN_USER`, and
 `GRAFANA_ADMIN_PASSWORD` in `.env` before exposing Grafana outside localhost.
+The default monitoring profile is tuned for one small EC2 instance: 30-second
+scrapes, 5-second scrape timeouts, and a 3-day/1GB Prometheus retention cap.
 
 Prometheus scrapes:
 

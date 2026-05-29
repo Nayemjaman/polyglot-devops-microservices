@@ -47,7 +47,7 @@ export function persistTokens(tokens: AuthTokens) {
     return;
   }
   accessToken = tokens.access;
-  localStorage.removeItem(ACCESS_TOKEN_KEY);
+  localStorage.setItem(ACCESS_TOKEN_KEY, tokens.access);
   if (tokens.refresh) {
     localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refresh);
   } else {
@@ -78,6 +78,13 @@ export function getStoredUser(): AuthUser | null {
 }
 
 export function getAccessToken() {
+  if (accessToken) {
+    return accessToken;
+  }
+  if (typeof window === "undefined") {
+    return null;
+  }
+  accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
   return accessToken;
 }
 
