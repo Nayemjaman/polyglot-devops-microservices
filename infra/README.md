@@ -52,15 +52,56 @@ successful `docker-build-push` job. The
 `production` environment approval gate must be approved first. The deploy job:
 
 - SSHs into EC2
-- pulls the updated image tag
+- detects which service images changed from the pushed file paths
+- pulls the updated image tag for only those services
 - runs the matching migration service when needed
-- restarts only the updated runtime service containers
-- waits for the service health check
-- restores the previous image tag and restarts the service if health fails
+- starts the updated runtime containers as the inactive blue/green color
+- waits for candidate container health checks
+- recreates Caddy so traffic switches to the new color-specific upstreams
+- restores the previous image tag/upstream metadata and stops candidate
+  containers if health fails before the traffic switch
 
 The workflow blocks `prod` pushes unless the pushed commit already exists in
 `staging`. Promote by fast-forwarding or pushing a known-good staging commit to
 `prod`; do not commit directly on `prod`.
+
+Changed-service detection is path based:
+
+| Changed path | Built/deployed image |
+| --- | --- |
+| `frontend/**` | `frontend` |
+| `services/auth-service/**` | `auth-service` |
+| `services/transaction-service/**` | `transaction-service` |
+| `services/budget-service/**` | `budget-service` |
+| `services/report-service/**` | `report-service` |
+| `proto/budget/**` | `budget-service` |
+| `proto/transaction/**` | `transaction-service`, `budget-service` |
+| `infra/**`, `.github/workflows/ci-cd.yml` | all services |
+
+## Blue-green Compose deployment
+
+Production deploys use `docker-compose.blue-green.yml` in addition to the base
+and EC2 override files. Shared infrastructure containers keep their stable names
+and volumes. Application containers run with color-specific names such as
+`transaction-service-green` or `frontend-blue`, then Caddy routes public traffic
+to the active upstream stored in `.env`.
+
+The first deployment from an existing single-color EC2 stack starts green
+candidate containers and switches Caddy from the original stable service names
+to the green names after health checks pass. Later deployments alternate each
+changed service between `blue` and `green` independently.
+
+The active service state is tracked in `.env`:
+
+```env
+FRONTEND_ACTIVE_COLOR=green
+FRONTEND_UPSTREAM=frontend-green
+TRANSACTION_SERVICE_ACTIVE_COLOR=blue
+TRANSACTION_SERVICE_UPSTREAM=transaction-service-blue
+```
+
+Only changed services move to a new color. Unchanged services keep their current
+upstream, so a frontend-only deploy does not restart backend containers.
 
 You can still deploy the full current `.env` image set manually from EC2:
 

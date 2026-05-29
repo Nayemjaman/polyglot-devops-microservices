@@ -7,6 +7,7 @@ IMAGE_SHA="${IMAGE_SHA:?IMAGE_SHA is required}"
 cd "$(dirname "$0")"
 
 COMPOSE_FILES="-f docker-compose.yml -f docker-compose.ec2.yml"
+BLUE_GREEN_COMPOSE_FILES="$COMPOSE_FILES -f docker-compose.blue-green.yml"
 ENV_FILE=".env"
 ROLLBACK_FILE=".deploy-rollback.env"
 
@@ -28,7 +29,13 @@ set_env_value() {
 
 get_env_value() {
   key="$1"
-  grep "^${key}=" "$ENV_FILE" | tail -n 1 | cut -d= -f2- || true
+  default="${2:-}"
+  value="$(grep "^${key}=" "$ENV_FILE" | tail -n 1 | cut -d= -f2- || true)"
+  if [ -n "$value" ]; then
+    printf '%s\n' "$value"
+  else
+    printf '%s\n' "$default"
+  fi
 }
 
 wait_for_health() {
@@ -72,42 +79,6 @@ run_migration() {
   esac
 }
 
-runtime_services() {
-  service="$1"
-  case "$service" in
-    frontend)
-      printf '%s\n' frontend
-      ;;
-    auth-service)
-      printf '%s\n' auth-service
-      ;;
-    budget-service)
-      printf '%s\n' budget-service
-      ;;
-    report-service)
-      printf '%s\n' report-service report-worker
-      ;;
-    transaction-service)
-      printf '%s\n' transaction-service transaction-outbox-publisher
-      ;;
-    *)
-      echo "Unknown service: $service" >&2
-      return 1
-      ;;
-  esac
-}
-
-container_for_health() {
-  service="$1"
-  case "$service" in
-    frontend) echo frontend ;;
-    auth-service) echo auth-service ;;
-    budget-service) echo budget-service ;;
-    report-service) echo report-service ;;
-    transaction-service) echo transaction-service ;;
-  esac
-}
-
 tag_key_for_service() {
   service="$1"
   case "$service" in
@@ -123,52 +94,168 @@ tag_key_for_service() {
   esac
 }
 
-rollback_service() {
+active_color_key_for_service() {
   service="$1"
-  key="$(tag_key_for_service "$service")"
-  previous_tag="$(grep "^${key}=" "$ROLLBACK_FILE" | tail -n 1 | cut -d= -f2- || true)"
-
-  if [ -z "$previous_tag" ]; then
-    echo "No previous tag found for $service; cannot roll back automatically."
-    return 1
-  fi
-
-  echo "Rolling back $service to $previous_tag"
-  set_env_value "$key" "$previous_tag"
-  docker compose $COMPOSE_FILES pull $(runtime_services "$service")
-  docker compose $COMPOSE_FILES up -d --no-build $(runtime_services "$service")
-  wait_for_health "$(container_for_health "$service")"
+  case "$service" in
+    frontend) echo FRONTEND_ACTIVE_COLOR ;;
+    auth-service) echo AUTH_SERVICE_ACTIVE_COLOR ;;
+    budget-service) echo BUDGET_SERVICE_ACTIVE_COLOR ;;
+    report-service) echo REPORT_SERVICE_ACTIVE_COLOR ;;
+    transaction-service) echo TRANSACTION_SERVICE_ACTIVE_COLOR ;;
+    *)
+      echo "Unknown service: $service" >&2
+      return 1
+      ;;
+  esac
 }
 
-deploy_service() {
+upstream_key_for_service() {
   service="$1"
-  key="$(tag_key_for_service "$service")"
-  previous_tag="$(get_env_value "$key")"
+  case "$service" in
+    frontend) echo FRONTEND_UPSTREAM ;;
+    auth-service) echo AUTH_SERVICE_UPSTREAM ;;
+    budget-service) echo BUDGET_SERVICE_UPSTREAM ;;
+    report-service) echo REPORT_SERVICE_UPSTREAM ;;
+    transaction-service) echo TRANSACTION_SERVICE_UPSTREAM ;;
+    *)
+      echo "Unknown service: $service" >&2
+      return 1
+      ;;
+  esac
+}
+
+opposite_color() {
+  color="$1"
+  if [ "$color" = "green" ]; then
+    echo blue
+  else
+    echo green
+  fi
+}
+
+container_for_service_color() {
+  service="$1"
+  color="$2"
+  echo "${service}-${color}"
+}
+
+colored_runtime_services() {
+  service="$1"
+  color="$2"
+  case "$service" in
+    frontend)
+      printf '%s\n' "frontend-${color}"
+      ;;
+    auth-service)
+      printf '%s\n' "auth-service-${color}"
+      ;;
+    budget-service)
+      printf '%s\n' "budget-service-${color}"
+      ;;
+    report-service)
+      printf '%s\n' "report-service-${color}" "report-worker-${color}"
+      ;;
+    transaction-service)
+      printf '%s\n' "transaction-service-${color}" "transaction-outbox-publisher-${color}"
+      ;;
+    *)
+      echo "Unknown service: $service" >&2
+      return 1
+      ;;
+  esac
+}
+
+save_rollback_value() {
+  service="$1"
+  key="$2"
+  value="$3"
+  printf '%s__%s=%s\n' "$service" "$key" "$value" >> "$ROLLBACK_FILE"
+}
+
+get_rollback_value() {
+  service="$1"
+  key="$2"
+  grep "^${service}__${key}=" "$ROLLBACK_FILE" | tail -n 1 | cut -d= -f2- || true
+}
+
+prepare_service() {
+  service="$1"
+  tag_key="$(tag_key_for_service "$service")"
+  color_key="$(active_color_key_for_service "$service")"
+  upstream_key="$(upstream_key_for_service "$service")"
+
+  previous_tag="$(get_env_value "$tag_key")"
+  previous_color="$(get_env_value "$color_key" blue)"
+  previous_upstream="$(get_env_value "$upstream_key" "$service")"
+  candidate_color="$(opposite_color "$previous_color")"
+  candidate_upstream="$(container_for_service_color "$service" "$candidate_color")"
   new_tag="${service}-${IMAGE_SHA}"
 
-  echo "${key}=${previous_tag}" >> "$ROLLBACK_FILE"
-  echo "Deploying $service with tag $new_tag"
-  set_env_value "$key" "$new_tag"
+  save_rollback_value "$service" "$tag_key" "$previous_tag"
+  save_rollback_value "$service" "$color_key" "$previous_color"
+  save_rollback_value "$service" "$upstream_key" "$previous_upstream"
+  save_rollback_value "$service" CANDIDATE_COLOR "$candidate_color"
 
-  if ! docker compose $COMPOSE_FILES pull $(runtime_services "$service"); then
-    rollback_service "$service"
-    return 1
-  fi
+  echo "Preparing $service as $candidate_color with tag $new_tag"
+  set_env_value "$tag_key" "$new_tag"
+  set_env_value "$color_key" "$candidate_color"
+  set_env_value "$upstream_key" "$candidate_upstream"
+}
 
-  if ! run_migration "$service"; then
-    rollback_service "$service"
-    return 1
-  fi
+pull_candidate() {
+  service="$1"
+  candidate_color="$(get_rollback_value "$service" CANDIDATE_COLOR)"
+  docker compose $BLUE_GREEN_COMPOSE_FILES pull $(colored_runtime_services "$service" "$candidate_color")
+}
 
-  if ! docker compose $COMPOSE_FILES up -d --no-build --no-deps $(runtime_services "$service"); then
-    rollback_service "$service"
-    return 1
-  fi
+start_candidate() {
+  service="$1"
+  candidate_color="$(get_rollback_value "$service" CANDIDATE_COLOR)"
+  docker compose $BLUE_GREEN_COMPOSE_FILES up -d --no-build --no-deps $(colored_runtime_services "$service" "$candidate_color")
+}
 
-  if ! wait_for_health "$(container_for_health "$service")"; then
-    rollback_service "$service"
-    return 1
-  fi
+stop_service_color() {
+  service="$1"
+  color="$2"
+  docker compose $BLUE_GREEN_COMPOSE_FILES stop $(colored_runtime_services "$service" "$color") >/dev/null 2>&1 || true
+}
+
+restore_service_env() {
+  service="$1"
+  tag_key="$(tag_key_for_service "$service")"
+  color_key="$(active_color_key_for_service "$service")"
+  upstream_key="$(upstream_key_for_service "$service")"
+
+  set_env_value "$tag_key" "$(get_rollback_value "$service" "$tag_key")"
+  set_env_value "$color_key" "$(get_rollback_value "$service" "$color_key")"
+  set_env_value "$upstream_key" "$(get_rollback_value "$service" "$upstream_key")"
+}
+
+rollback_all() {
+  echo "Rolling back deployment metadata and stopping candidate containers"
+  for service in $services; do
+    candidate_color="$(get_rollback_value "$service" CANDIDATE_COLOR)"
+    [ -n "$candidate_color" ] && stop_service_color "$service" "$candidate_color"
+    restore_service_env "$service"
+  done
+  docker compose $BLUE_GREEN_COMPOSE_FILES up -d --no-build --no-deps gateway || true
+}
+
+switch_gateway() {
+  echo "Switching gateway to the new upstreams"
+  docker compose $BLUE_GREEN_COMPOSE_FILES up -d --no-build --no-deps gateway
+  wait_for_health gateway 12 5
+}
+
+cleanup_previous_colors() {
+  for service in $services; do
+    previous_color="$(get_rollback_value "$service" "$(active_color_key_for_service "$service")")"
+    previous_upstream="$(get_rollback_value "$service" "$(upstream_key_for_service "$service")")"
+    if [ "$previous_upstream" = "$(container_for_service_color "$service" "$previous_color")" ]; then
+      echo "Stopping previous $service $previous_color containers"
+      stop_service_color "$service" "$previous_color"
+    fi
+  done
 }
 
 rm -f "$ROLLBACK_FILE"
@@ -181,14 +268,53 @@ if [ -z "$services" ]; then
 fi
 
 failed=0
+
 for service in $services; do
-  if ! deploy_service "$service"; then
+  prepare_service "$service"
+done
+
+for service in $services; do
+  if ! pull_candidate "$service"; then
     failed=1
   fi
 done
 
-docker compose $COMPOSE_FILES up -d --no-build gateway
-wait_for_health gateway 12 5
+if [ "$failed" -eq 0 ]; then
+  for service in $services; do
+    if ! run_migration "$service"; then
+      failed=1
+    fi
+  done
+fi
 
-docker compose $COMPOSE_FILES ps
-exit "$failed"
+if [ "$failed" -eq 0 ]; then
+  for service in $services; do
+    if ! start_candidate "$service"; then
+      failed=1
+    fi
+  done
+fi
+
+if [ "$failed" -eq 0 ]; then
+  for service in $services; do
+    candidate_color="$(get_rollback_value "$service" CANDIDATE_COLOR)"
+    if ! wait_for_health "$(container_for_service_color "$service" "$candidate_color")"; then
+      failed=1
+    fi
+  done
+fi
+
+if [ "$failed" -eq 0 ]; then
+  if ! switch_gateway; then
+    failed=1
+  fi
+fi
+
+if [ "$failed" -ne 0 ]; then
+  rollback_all
+  docker compose $BLUE_GREEN_COMPOSE_FILES ps
+  exit 1
+fi
+
+cleanup_previous_colors
+docker compose $BLUE_GREEN_COMPOSE_FILES ps

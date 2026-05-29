@@ -1,0 +1,294 @@
+x-default-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-app-runtime: &app-runtime
+  init: true
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  read_only: true
+  tmpfs:
+    - /tmp:size=64m,mode=1777
+  logging: *default-logging
+  restart: unless-stopped
+  networks:
+    - backend
+
+x-frontend-env: &frontend-env
+  NODE_ENV: production
+  PORT: 3000
+  HOSTNAME: 0.0.0.0
+  NEXT_PUBLIC_API_BASE_URL: ${FRONTEND_PUBLIC_API_BASE_URL:-}
+  API_PROXY_TARGET: http://gateway:8080
+  TRANSACTION_API_TARGET: http://${TRANSACTION_SERVICE_UPSTREAM:-transaction-service}:8002
+  REPORT_API_TARGET: http://${REPORT_SERVICE_UPSTREAM:-report-service}:8003
+  BUDGET_API_TARGET: http://${BUDGET_SERVICE_UPSTREAM:-budget-service}:8001
+
+x-auth-env: &auth-env
+  DJANGO_DEBUG: ${AUTH_DJANGO_DEBUG:-False}
+  DJANGO_SECRET_KEY: ${AUTH_DJANGO_SECRET_KEY:?AUTH_DJANGO_SECRET_KEY is required}
+  DJANGO_ALLOWED_HOSTS: ${AUTH_DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,auth-service}
+  CORS_ALLOWED_ORIGINS: ${AUTH_CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+  AUTH_ANON_RATE_LIMIT: ${AUTH_ANON_RATE_LIMIT:-300/minute}
+  AUTH_USER_RATE_LIMIT: ${AUTH_USER_RATE_LIMIT:-600/minute}
+  POSTGRES_DB: ${AUTH_DB_NAME:-auth_service_db}
+  POSTGRES_USER: ${AUTH_DB_USER:-auth_service_user}
+  POSTGRES_PASSWORD: ${AUTH_DB_PASSWORD:?AUTH_DB_PASSWORD is required}
+  POSTGRES_HOST: auth-pgbouncer
+  POSTGRES_PORT: 6432
+
+x-budget-env: &budget-env
+  APP_ENV: ${BUDGET_APP_ENV:-production}
+  HTTP_ADDR: :8001
+  BUDGET_GRPC_ADDR: :50051
+  AUTH_SERVICE_URL: http://${AUTH_SERVICE_UPSTREAM:-auth-service}:8000
+  TRANSACTION_GRPC_ADDR: ${TRANSACTION_SERVICE_UPSTREAM:-transaction-service}:50052
+  DATABASE_URL: postgres://${BUDGET_DB_USER:-budget_service_user}:${BUDGET_DB_PASSWORD:?BUDGET_DB_PASSWORD is required}@budget-pgbouncer:6432/${BUDGET_DB_NAME:-budget_service_db}?sslmode=disable
+  CORS_ALLOWED_ORIGINS: ${BUDGET_CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+  RUN_MIGRATIONS: ${BUDGET_RUN_MIGRATIONS:-false}
+  GRPC_SHARED_SECRET: ${BUDGET_GRPC_SHARED_SECRET:?BUDGET_GRPC_SHARED_SECRET is required}
+  DATABASE_MAX_OPEN_CONNS: ${BUDGET_DATABASE_MAX_OPEN_CONNS:-10}
+  DATABASE_MAX_IDLE_CONNS: ${BUDGET_DATABASE_MAX_IDLE_CONNS:-5}
+  DATABASE_CONN_MAX_LIFETIME_SECONDS: ${BUDGET_DATABASE_CONN_MAX_LIFETIME_SECONDS:-300}
+  RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-app}:${RABBITMQ_DEFAULT_PASS:-app_password}@rabbitmq:5672/
+  RABBITMQ_EXCHANGE: ${RABBITMQ_EXCHANGE:-finance.events}
+  BUDGET_TRANSACTION_EVENTS_QUEUE: ${BUDGET_TRANSACTION_EVENTS_QUEUE:-budget.transaction.events}
+
+x-report-env: &report-env
+  APP_NAME: ${REPORT_APP_NAME:-report-service}
+  APP_ENV: ${REPORT_APP_ENV:-production}
+  HOST: 0.0.0.0
+  PORT: 8003
+  AUTH_SERVICE_URL: http://${AUTH_SERVICE_UPSTREAM:-auth-service}:8000
+  HTTP_TIMEOUT_SECONDS: ${REPORT_HTTP_TIMEOUT_SECONDS:-5}
+  DATABASE_URL: postgresql+asyncpg://${REPORT_DB_USER:-report_service_user}:${REPORT_DB_PASSWORD:?REPORT_DB_PASSWORD is required}@report-pgbouncer:6432/${REPORT_DB_NAME:-report_service_db}?prepared_statement_cache_size=0
+  CORS_ALLOWED_ORIGINS: ${REPORT_CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+  GRPC_SHARED_SECRET: ${REPORT_GRPC_SHARED_SECRET:?REPORT_GRPC_SHARED_SECRET is required}
+  DATABASE_ECHO: ${REPORT_DATABASE_ECHO:-False}
+  DATABASE_POOL_SIZE: ${REPORT_DATABASE_POOL_SIZE:-5}
+  DATABASE_MAX_OVERFLOW: ${REPORT_DATABASE_MAX_OVERFLOW:-10}
+  REDIS_URL: redis://redis:6379/0
+  DASHBOARD_CACHE_TTL_SECONDS: ${REPORT_DASHBOARD_CACHE_TTL_SECONDS:-300}
+  RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-app}:${RABBITMQ_DEFAULT_PASS:-app_password}@rabbitmq:5672/
+  RABBITMQ_EXCHANGE: ${RABBITMQ_EXCHANGE:-finance.events}
+  REPORT_EXPORT_QUEUE: ${REPORT_EXPORT_QUEUE:-report.export.requests}
+  REPORT_TRANSACTION_EVENTS_QUEUE: ${REPORT_TRANSACTION_EVENTS_QUEUE:-report.transaction.events}
+
+x-transaction-env: &transaction-env
+  APP_NAME: ${TRANSACTION_APP_NAME:-transaction-service}
+  APP_ENV: ${TRANSACTION_APP_ENV:-production}
+  HOST: 0.0.0.0
+  PORT: 8002
+  AUTH_SERVICE_URL: http://${AUTH_SERVICE_UPSTREAM:-auth-service}:8000
+  HTTP_TIMEOUT_SECONDS: ${TRANSACTION_HTTP_TIMEOUT_SECONDS:-5}
+  DATABASE_URL: postgresql+asyncpg://${TRANSACTION_DB_USER:-transaction_service_user}:${TRANSACTION_DB_PASSWORD:?TRANSACTION_DB_PASSWORD is required}@transaction-pgbouncer:6432/${TRANSACTION_DB_NAME:-transaction_service_db}?prepared_statement_cache_size=0
+  CORS_ALLOWED_ORIGINS: ${TRANSACTION_CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+  GRPC_SHARED_SECRET: ${TRANSACTION_GRPC_SHARED_SECRET:?TRANSACTION_GRPC_SHARED_SECRET is required}
+  DATABASE_ECHO: ${TRANSACTION_DATABASE_ECHO:-False}
+  DATABASE_POOL_SIZE: ${TRANSACTION_DATABASE_POOL_SIZE:-5}
+  DATABASE_MAX_OVERFLOW: ${TRANSACTION_DATABASE_MAX_OVERFLOW:-10}
+  STORAGE_ENDPOINT_URL: http://transaction-minio:9000
+  STORAGE_REGION: ${TRANSACTION_STORAGE_REGION:-us-east-1}
+  STORAGE_ACCESS_KEY: ${TRANSACTION_STORAGE_ACCESS_KEY:?TRANSACTION_STORAGE_ACCESS_KEY is required}
+  STORAGE_SECRET_KEY: ${TRANSACTION_STORAGE_SECRET_KEY:?TRANSACTION_STORAGE_SECRET_KEY is required}
+  STORAGE_BUCKET_NAME: ${TRANSACTION_STORAGE_BUCKET_NAME:-transaction-attachments}
+  STORAGE_PUBLIC_BASE_URL: ${TRANSACTION_STORAGE_PUBLIC_BASE_URL:-http://127.0.0.1:9000}
+  STORAGE_PATH_PREFIX: ${TRANSACTION_STORAGE_PATH_PREFIX:-attachments}
+
+x-transaction-worker-env: &transaction-worker-env
+  <<: *transaction-env
+  RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-app}:${RABBITMQ_DEFAULT_PASS:-app_password}@rabbitmq:5672/
+  RABBITMQ_EXCHANGE: ${RABBITMQ_EXCHANGE:-finance.events}
+  OUTBOX_BATCH_SIZE: ${TRANSACTION_OUTBOX_BATCH_SIZE:-50}
+  OUTBOX_POLL_INTERVAL_SECONDS: ${TRANSACTION_OUTBOX_POLL_INTERVAL_SECONDS:-2}
+  OUTBOX_MAX_ATTEMPTS: ${TRANSACTION_OUTBOX_MAX_ATTEMPTS:-10}
+
+services:
+  gateway:
+    environment:
+      FRONTEND_UPSTREAM: ${FRONTEND_UPSTREAM:-frontend}
+      AUTH_SERVICE_UPSTREAM: ${AUTH_SERVICE_UPSTREAM:-auth-service}
+      BUDGET_SERVICE_UPSTREAM: ${BUDGET_SERVICE_UPSTREAM:-budget-service}
+      REPORT_SERVICE_UPSTREAM: ${REPORT_SERVICE_UPSTREAM:-report-service}
+      TRANSACTION_SERVICE_UPSTREAM: ${TRANSACTION_SERVICE_UPSTREAM:-transaction-service}
+
+  frontend-blue:
+    <<: *app-runtime
+    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/polyglot-devops-microservices:${FRONTEND_IMAGE_TAG:-frontend-prod}
+    container_name: frontend-blue
+    environment: *frontend-env
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  frontend-green:
+    <<: *app-runtime
+    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/polyglot-devops-microservices:${FRONTEND_IMAGE_TAG:-frontend-prod}
+    container_name: frontend-green
+    environment: *frontend-env
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  auth-service-blue:
+    <<: *app-runtime
+    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/polyglot-devops-microservices:${AUTH_SERVICE_IMAGE_TAG:-auth-service-prod}
+    container_name: auth-service-blue
+    environment: *auth-env
+    command: ["gunicorn", "core.asgi:application", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000", "--workers", "4"]
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import socket; s=socket.create_connection(('127.0.0.1', 8000), 3); s.close()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  auth-service-green:
+    <<: *app-runtime
+    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/polyglot-devops-microservices:${AUTH_SERVICE_IMAGE_TAG:-auth-service-prod}
+    container_name: auth-service-green
+    environment: *auth-env
+    command: ["gunicorn", "core.asgi:application", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000", "--workers", "4"]
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import socket; s=socket.create_connection(('127.0.0.1', 8000), 3); s.close()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  budget-service-blue:
+    <<: *app-runtime
+    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/polyglot-devops-microservices:${BUDGET_SERVICE_IMAGE_TAG:-budget-service-prod}
+    container_name: budget-service-blue
+    environment: *budget-env
+    expose:
+      - "8001"
+      - "50051"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8001/health >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  budget-service-green:
+    <<: *app-runtime
+    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/polyglot-devops-microservices:${BUDGET_SERVICE_IMAGE_TAG:-budget-service-prod}
+    container_name: budget-service-green
+    environment: *budget-env
+    expose:
+      - "8001"
+      - "50051"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8001/health >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  report-service-blue:
+    <<: *app-runtime
+    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/polyglot-devops-microservices:${REPORT_SERVICE_IMAGE_TAG:-report-service-prod}
+    container_name: report-service-blue
+    environment: *report-env
+    expose:
+      - "8003"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import socket; s=socket.create_connection(('127.0.0.1', 8003), 3); s.close()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  report-service-green:
+    <<: *app-runtime
+    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/polyglot-devops-microservices:${REPORT_SERVICE_IMAGE_TAG:-report-service-prod}
+    container_name: report-service-green
+    environment: *report-env
+    expose:
+      - "8003"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import socket; s=socket.create_connection(('127.0.0.1', 8003), 3); s.close()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  report-worker-blue:
+    <<: *app-runtime
+    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/polyglot-devops-microservices:${REPORT_SERVICE_IMAGE_TAG:-report-service-prod}
+    container_name: report-worker-blue
+    environment: *report-env
+    command: ["python", "-m", "app.workers.export_worker"]
+
+  report-worker-green:
+    <<: *app-runtime
+    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/polyglot-devops-microservices:${REPORT_SERVICE_IMAGE_TAG:-report-service-prod}
+    container_name: report-worker-green
+    environment: *report-env
+    command: ["python", "-m", "app.workers.export_worker"]
+
+  transaction-service-blue:
+    <<: *app-runtime
+    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/polyglot-devops-microservices:${TRANSACTION_SERVICE_IMAGE_TAG:-transaction-service-prod}
+    container_name: transaction-service-blue
+    environment: *transaction-env
+    expose:
+      - "8002"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import socket; s=socket.create_connection(('127.0.0.1', 8002), 3); s.close()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  transaction-service-green:
+    <<: *app-runtime
+    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/polyglot-devops-microservices:${TRANSACTION_SERVICE_IMAGE_TAG:-transaction-service-prod}
+    container_name: transaction-service-green
+    environment: *transaction-env
+    expose:
+      - "8002"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import socket; s=socket.create_connection(('127.0.0.1', 8002), 3); s.close()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  transaction-outbox-publisher-blue:
+    <<: *app-runtime
+    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/polyglot-devops-microservices:${TRANSACTION_SERVICE_IMAGE_TAG:-transaction-service-prod}
+    container_name: transaction-outbox-publisher-blue
+    environment: *transaction-worker-env
+    command: ["python", "-m", "app.workers.outbox_publisher"]
+
+  transaction-outbox-publisher-green:
+    <<: *app-runtime
+    image: ${DOCKERHUB_USER_NAME:?DOCKERHUB_USER_NAME is required}/polyglot-devops-microservices:${TRANSACTION_SERVICE_IMAGE_TAG:-transaction-service-prod}
+    container_name: transaction-outbox-publisher-green
+    environment: *transaction-worker-env
+    command: ["python", "-m", "app.workers.outbox_publisher"]
+
+networks:
+  backend:
+    name: polyglot-devops-microservices_backend
+    external: true

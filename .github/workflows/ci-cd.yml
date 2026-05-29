@@ -330,18 +330,68 @@ jobs:
           }
 
           add_all_services() {
-            add_service "frontend" "frontend"
-            add_service "auth-service" "services/auth-service"
-            add_service "transaction-service" "services/transaction-service"
-            add_service "budget-service" "services/budget-service"
-            add_service "report-service" "services/report-service"
+            add_if_missing "frontend" "frontend"
+            add_if_missing "auth-service" "services/auth-service"
+            add_if_missing "transaction-service" "services/transaction-service"
+            add_if_missing "budget-service" "services/budget-service"
+            add_if_missing "report-service" "services/report-service"
+          }
+
+          add_if_missing() {
+            local name="$1"
+            local path="$2"
+            if ! jq -e --arg name "$name" '.[] | select(.name == $name)' <<< "$services" >/dev/null; then
+              add_service "$name" "$path"
+            fi
           }
 
           if [ "${{ github.event_name }}" = "push" ]; then
-            add_all_services
+            before="${{ github.event.before }}"
+            if [ -z "$before" ] || [[ "$before" =~ ^0+$ ]]; then
+              before="$(git rev-parse HEAD^)"
+            fi
+
+            changed_files="$(git diff --name-only "$before" "${{ github.sha }}")"
+            echo "$changed_files"
+
+            while IFS= read -r file; do
+              [ -n "$file" ] || continue
+
+              case "$file" in
+                frontend/*)
+                  add_if_missing "frontend" "frontend"
+                  ;;
+                services/auth-service/*)
+                  add_if_missing "auth-service" "services/auth-service"
+                  ;;
+                services/transaction-service/*)
+                  add_if_missing "transaction-service" "services/transaction-service"
+                  ;;
+                services/budget-service/*)
+                  add_if_missing "budget-service" "services/budget-service"
+                  ;;
+                services/report-service/*)
+                  add_if_missing "report-service" "services/report-service"
+                  ;;
+                proto/budget/*)
+                  add_if_missing "budget-service" "services/budget-service"
+                  ;;
+                proto/transaction/*)
+                  add_if_missing "transaction-service" "services/transaction-service"
+                  add_if_missing "budget-service" "services/budget-service"
+                  ;;
+                infra/*|.github/workflows/ci-cd.yml)
+                  add_all_services
+                  ;;
+              esac
+            done <<< "$changed_files"
 
             matrix="$(jq -c --argjson include "$services" '{include: $include}' <<< '{}')"
-            echo 'has_changes=true' >> "$GITHUB_OUTPUT"
+            if [ "$services" = "[]" ]; then
+              echo 'has_changes=false' >> "$GITHUB_OUTPUT"
+            else
+              echo 'has_changes=true' >> "$GITHUB_OUTPUT"
+            fi
             echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
             exit 0
           fi
