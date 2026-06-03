@@ -52,12 +52,6 @@ deployments.
 | `/api/*` | `transaction-service:8002` |
 | `/*` | `frontend:3000` |
 
-Local gateway entrypoints:
-
-| Protocol | URL |
-| --- | --- |
-| HTTP | `http://127.0.0.1:8080` |
-| HTTPS with Caddy internal CA | `https://127.0.0.1:8443` |
 
 ### CI/CD Pipeline
 
@@ -160,17 +154,6 @@ Responsibilities:
 - Auth middleware support for downstream services
 - Metrics endpoint
 
-Core routes:
-
-```text
-POST  /auth/register
-POST  /auth/login
-POST  /auth/refresh
-GET   /auth/me
-PATCH /auth/me
-POST  /auth/logout
-GET   /metrics
-```
 
 ### Transaction Service
 
@@ -199,33 +182,7 @@ Responsibilities:
 - Storage health checks
 - Event publishing through an outbox model
 
-Core route groups:
 
-```text
-GET    /health
-GET    /health/db
-GET    /health/storage
-POST   /api/wallets
-GET    /api/wallets
-POST   /api/categories
-GET    /api/categories
-POST   /api/payment-methods
-GET    /api/payment-methods
-POST   /api/transactions
-GET    /api/transactions
-PATCH  /api/transactions/{id}
-DELETE /api/transactions/{id}
-GET    /api/transactions/summary/monthly
-GET    /api/transactions/summary/yearly
-GET    /api/transactions/summary/category-wise
-GET    /api/transactions/summary/wallet-wise
-POST   /api/recurring-transactions
-GET    /api/recurring-transactions
-POST   /api/transactions/{transaction_id}/attachments
-GET    /api/transactions/{transaction_id}/attachments
-POST   /api/tags
-GET    /api/tags
-```
 
 ### Budget Service
 
@@ -251,24 +208,6 @@ Responsibilities:
 - Auth-service integration
 - Transaction event consumption
 
-Core routes:
-
-```text
-GET    /health
-GET    /metrics
-POST   /api/budgets
-GET    /api/budgets
-GET    /api/budgets/{id}
-PATCH  /api/budgets/{id}
-DELETE /api/budgets/{id}
-POST   /api/budgets/{id}/categories
-GET    /api/budgets/{id}/categories
-POST   /api/budgets/{id}/alert-rules
-GET    /api/budgets/{id}/alert-rules
-GET    /api/budgets/status/monthly
-GET    /api/budgets/status/category-wise
-GET    /api/budgets/{id}/usage
-```
 
 ### Report Service
 
@@ -298,21 +237,6 @@ Responsibilities:
 
 Core routes:
 
-```text
-GET  /health
-GET  /health/db
-GET  /api/reports/monthly
-GET  /api/reports/yearly
-GET  /api/reports/income-vs-expense
-GET  /api/reports/category-wise
-GET  /api/reports/wallet-wise
-GET  /api/reports/budget-performance
-GET  /api/reports/savings
-GET  /api/reports/dashboard
-POST /api/reports/export
-GET  /api/reports/export-jobs
-GET  /api/reports/files/{id}/download
-```
 
 ## Other Architecture Components
 
