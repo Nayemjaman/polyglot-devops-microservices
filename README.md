@@ -424,4 +424,3 @@ Monitoring URLs:
 |-- api_smoke_test.py            # End-to-end API smoke test script
 `-- sonar-project.properties     # SonarQube project configuration
 ```
-
